@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2. Nettoyage - Eurosmart Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    
+
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <div class="container mx-auto flex justify-between items-center relative h-10">
+        <!-- Logo - Côté Gauche -->
+        <a href="/" class="h-10 flex items-center z-10">
+             <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
+        </a>
+        
+        <!-- Nouveau Cercle de Texte Rotatif - Côté Droit -->
+        <div class="rotating-text-container">
+            <div class="rotating-content">
+                <!-- LE CONTENU EST DUPLIQUÉ CI-DESSOUS POUR UN EFFET DE BOUCLE SANS PAUSE -->
+               
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+                
+                
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+            </div>
+        </div>
+        
+    </div>
+</nav>
+
+    <main class="container mx-auto p-8 flex-grow">
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Nettoyage et Préparation des Données</h1>
+        <p class="text-gray-200 mb-8 text-center">Utilisez les outils ci-dessous pour inspecter, nettoyer et enrichir votre jeu de données.</p>
+        
+        <!-- CARTE 1: OUTILS D'ANALYSE ET D'ACTION -->
+        <div class="main-card p-6 md:p-10 text-center">
+            <h2 class="text-2xl font-bold mb-6 text-gray-700">1. Outils d'Analyse et d'Action</h2>
+            
+            <div class="mt-8 text-center flex flex-wrap gap-4 justify-center">
+                <button id="show-stats-btn" class="btn-gradient">📊 Statistiques Descriptives</button>
+                <button id="get-cities-btn" class="btn-gradient">🏙️ Villes Uniques</button>
+                <button id="show-daily-avg-btn" class="btn-gradient">☀️ Moyennes Journalières</button>
+            </div>
+
+            <div id="result-container" class="mt-8 text-left hidden">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">Résultats</h2>
+                <div id="results-display" class="overflow-x-auto p-4 bg-gray-100 rounded-lg">
+                    </div>
+            </div>
+
+            <div id="message-container" class="mt-6 text-center text-lg text-gray-800"></div>
+            
+            <div id="redirect-btn-container" class="mt-6 hidden">
+                <button onclick="window.location.href='/visualizations'" class="btn-gradient">Aller à la page Visualisation →</button>
+            </div>
+        </div>
+
+        <!-- CARTE 2: APERÇU DU JEU DE DONNÉES -->
+        <div id="data-preview-card" class="main-card p-6 md:p-10 text-center mt-8">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">2. Aperçu du Jeu de Données</h2>
+            
+            <div id="df-info" class="text-left text-gray-600 mb-4 font-semibold">
+                <p>Lignes: <span id="row-count">...</span></p>
+                <p>Colonnes: <span id="col-count">...</span></p>
+            </div>
+            
+            <div id="df-preview" class="overflow-x-auto df-preview text-sm">
+                <p class="text-center text-gray-500 mt-8">Chargement du jeu de données depuis le serveur...</p>
+            </div>
+        </div>
+
+
+    </main>
+
+    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+        <div class="container mx-auto">
+            <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
+                <a href="/upload" class="transform hover:scale-110 transition duration-300">📥</a>
+                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧹</a>
+                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📊</a>
+                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮</a>
+            </div>
+            <p class="text-sm mt-4">&copy; 2026 Eurosmart Analytics. Tous droits réservés. ✨</p>
+            <p class="text-sm mt-2">
+                <span class="mr-2">📞</span>
+                <a href="tel:+33160626566" class="hover:underline">+33 1 60 62 65 66</a>
+            </p>
+        </div>
+    </footer>
+    
+    <script>
+        const messageContainer = document.getElementById('message-container');
+        const previewContainer = document.getElementById('df-preview');
+        const infoContainer = document.getElementById('df-info');
+        const resultContainer = document.getElementById('result-container');
+        const resultsDisplay = document.getElementById('results-display');
+        const rowCountSpan = document.getElementById('row-count');
+        const colCountSpan = document.getElementById('col-count');
+        const redirectBtnContainer = document.getElementById('redirect-btn-container');
+        // SUPPRIMÉ 🔑 : usernameDisplay a été retiré
+
+        const displayMessage = (msg, type) => {
+            messageContainer.textContent = msg;
+            // Utiliser des couleurs adaptées au fond clair de la carte principale
+            messageContainer.style.color = (type === 'error') ? '#ff4d4d' : '#4b52ff'; 
+        };
+
+        const displayLoading = () => {
+            resultsDisplay.innerHTML = '<p class="text-center text-gray-500">Chargement en cours...</p>';
+            resultContainer.classList.remove('hidden');
+        };
+
+        // Fonction principale pour récupérer et afficher les informations
+        const fetchDataPreview = async () => {
+            // Pas de loading affiché ici pour ne pas masquer le tableau initialement
+            try {
+                const response = await fetch('/get_data_info');
+                const result = await response.json();
+                if (response.ok) {
+                    rowCountSpan.textContent = result.data_info.rows;
+                    colCountSpan.textContent = result.data_info.columns.length;
+                    previewContainer.innerHTML = result.data_preview_html;
+                    redirectBtnContainer.classList.remove('hidden');
+                } else {
+                    previewContainer.innerHTML = `<p class="text-center text-red-500 mt-8">${result.error}</p>`;
+                    displayMessage(result.error, 'error');
+                    redirectBtnContainer.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Erreur lors de la récupération des informations:', error);
+                previewContainer.innerHTML = '<p class="text-center text-red-500 mt-8">Une erreur inattendue est survenue lors du chargement des données.</p>';
+                displayMessage('Une erreur inattendue est survenue.', 'error');
+                redirectBtnContainer.classList.add('hidden');
+            }
+        };
+
+        // Fonctions pour les calculs automatiques
+        const calculateDewPoint = async () => {
+            try {
+                const response = await fetch('/calculate_dew_point');
+                const result = await response.json();
+                if (response.ok) {
+                    displayMessage(result.message, 'success');
+                } else {
+                    displayMessage(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erreur lors du calcul du point de rosée:', error);
+                displayMessage('Une erreur inattendue est survenue.', 'error');
+            }
+        };
+        
+        const calculateTempDewPointDiff = async () => {
+            try {
+                const response = await fetch('/calculate_temp_dew_point_diff', { method: 'POST' });
+                const result = await response.json();
+                if (response.ok) {
+                    displayMessage(result.message, 'success');
+                } else {
+                    displayMessage(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erreur lors du calcul de la différence:', error);
+                displayMessage('Une erreur inattendue est survenue.', 'error');
+            }
+        };
+
+        // Fonctions pour les boutons
+        const fetchDescriptiveStats = async () => {
+            displayLoading();
+            try {
+                const response = await fetch('/get_descriptive_stats');
+                const result = await response.json();
+                if (response.ok) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = result.stats_html;
+                    const table = tempDiv.querySelector('table');
+                    
+                    if (table) {
+                        table.className = 'data-table';
+                    }
+
+                    resultsDisplay.innerHTML = `
+                        <h3 class="font-bold text-lg mb-2 text-gray-800">Statistiques Descriptives</h3>
+                        ${tempDiv.innerHTML}
+                    `;
+                } else {
+                    resultsDisplay.innerHTML = `<p class="text-gray-500">${result.error}</p>`;
+                }
+            } catch (error) {
+                console.error('Erreur lors de la récupération des stats:', error);
+                resultsDisplay.innerHTML = '<p class="text-gray-500">Erreur lors de la récupération des statistiques.</p>';
+            } finally {
+                resultContainer.classList.remove('hidden');
+            }
+        };
+
+        const getUniqueCities = async () => {
+            displayLoading();
+            try {
+                const response = await fetch('/get_unique_cities');
+                const result = await response.json();
+                if (response.ok) {
+                    if (result.cities && result.cities.length > 0) {
+                        const cityListHtml = result.cities.map(city => `<li class="p-1 border-b border-gray-300">${city}</li>`).join('');
+                        resultsDisplay.innerHTML = `
+                            <h3 class="font-bold text-lg mb-2 text-gray-800">Villes Uniques</h3>
+                            <ul class="list-none text-gray-600 border border-gray-300 rounded-md p-2">${cityListHtml}</ul>
+                        `;
+                    } else {
+                        resultsDisplay.innerHTML = '<p class="text-gray-500">Aucune ville unique trouvée dans les données.</p>';
+                    }
+                } else {
+                    resultsDisplay.innerHTML = `<p class="text-gray-500">${result.error}</p>`;
+                }
+            } catch (error) {
+                console.error('Erreur lors de la récupération des villes:', error);
+                resultsDisplay.innerHTML = '<p class="text-gray-500">Erreur lors de la récupération des villes.</p>';
+            } finally {
+                resultContainer.classList.remove('hidden');
+            }
+        };
+        
+        const showDailyAverages = async () => {
+            displayLoading();
+            try {
+                const response = await fetch('/get_daily_dew_point_averages');
+                const result = await response.json();
+                if (response.ok) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = result.daily_avg_html;
+                    const table = tempDiv.querySelector('table');
+                    
+                    if (table) {
+                        table.className = 'data-table';
+                    }
+
+                    resultsDisplay.innerHTML = `
+                        <h3 class="font-bold text-lg mb-2 text-gray-800">Moyennes Journalières</h3>
+                        ${tempDiv.innerHTML}
+                    `;
+                } else {
+                    resultsDisplay.innerHTML = `<p class="text-gray-500">${result.error}</p>`;
+                }
+            } catch (error) {
+                console.error('Erreur lors de l\'affichage des moyennes journalières:', error);
+                resultsDisplay.innerHTML = '<p class="text-gray-500">Erreur lors de la récupération des moyennes journalières.</p>';
+            } finally {
+                resultContainer.classList.remove('hidden');
+            }
+        };
+
+       
+
+        const initializePage = async () => {
+            // Automatiser les calculs avant d'afficher les données
+            await calculateDewPoint();
+            await calculateTempDewPointDiff();
+            // Afficher le jeu de données mis à jour
+            await fetchDataPreview();
+        };
+
+        // Événements
+        document.addEventListener('DOMContentLoaded', initializePage);
+        document.getElementById('show-stats-btn').addEventListener('click', fetchDescriptiveStats);
+        document.getElementById('get-cities-btn').addEventListener('click', getUniqueCities);
+        document.getElementById('show-daily-avg-btn').addEventListener('click', showDailyAverages);
+
+    </script>
+</body>
+</html>

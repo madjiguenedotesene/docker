@@ -1,0 +1,312 @@
+/* ========================================================= */
+/* 1. STYLES GÉNÉRAUX & ANIMATION (Body, Background) */
+/* ========================================================= */
+body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #a742b7, #4b52ff, #ff69b4);
+    background-size: 200% 200%;
+    animation: gradientAnimation 10s ease infinite;
+    color: #FFFFFF;
+    overflow-x: hidden;
+    padding-top: 80px;
+}
+
+@keyframes gradientAnimation {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* ========================================================= */
+/* 2. NAVIGATION & FOOTER */
+/* ========================================================= */
+.top-nav { 
+    background-color: rgba(0, 0, 0, 0.3); 
+    z-index: 50; /* Assure que la nav est en haut de tout */
+}
+.footer-transparent { 
+    background-color: rgba(0, 0, 0, 0.3); 
+}
+
+.nav-link {
+    /* Base styles */
+    padding: 3px 12px; /* px-3 py-2 */
+    font-size: 0.875rem; /* text-sm */
+    font-weight: 500; /* font-medium */
+    transition: all 0.3s ease; /* transition-all duration-300 */
+    transform: scale(1); /* transform */
+    
+    background-color: transparent; 
+    border: 1px solid rgba(255, 255, 255, 0.3); 
+    border-radius: 10px;
+    color: white; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.nav-link:hover { 
+    transform: scale(1.05); /* hover:scale-105 */
+    background-color: rgba(255, 255, 255, 0.2); 
+}
+
+/* ========================================================= */
+/* 3. CARTES & BOUTONS */
+/* ========================================================= */
+.main-card {
+    background: #ffffff; 
+    box-shadow: 0 10px 30px rgba(255, 105, 180, 0.2); 
+    border-radius: 2rem; 
+    transform: translateY(0); 
+    transition: transform 0.5s ease-out; 
+    color: black;
+}
+.main-card:hover { 
+    transform: translateY(-5px); 
+}
+
+.btn-gradient {
+    background: linear-gradient(135deg, #a742b7, #4b52ff, #ff69b4); 
+    color: white; 
+    font-weight: bold; 
+    padding: 12px 24px; 
+    border-radius: 9999px; 
+    border: none; 
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); 
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out; 
+}
+.btn-gradient:hover { 
+    transform: scale(1.08);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); 
+}
+/* ========================================================= */
+/* 4. STYLES DES TABLEAUX (Data Preparation page) */
+/* ========================================================= */
+/* Conteneur pour le défilement et la hauteur max */
+.table-preview {
+    max-height: 400px;
+    overflow: auto;
+    margin-top: 20px;
+}
+/* Style pour la balise table à l'intérieur du conteneur */
+.table-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    color: black;
+}
+.table-preview th, .table-preview td {
+    border: 2px solid #e2e8f0;
+    border-radius: 1rem;
+    padding: 8px 12px;
+    text-align: left;
+}
+.table-preview th {
+    background-color: #f9f1f8;
+    font-weight: bold;
+}
+
+/* Style du tableau de données (utilisé pour les résultats dynamiques) */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    background-color: rgb(255, 255, 255);
+    border-radius: 1rem;
+    overflow: hidden;
+}
+.data-table th, .data-table td {
+    border: 5px solid #e2e8f0;
+    border-radius: 1rem;
+    padding: 8px;
+    text-align: left;
+    font-size: 0.875rem;
+}
+.data-table thead {
+    background-color: #fcf7fc;
+}
+.data-table tbody tr:hover {
+    background-color: #f9f1f9;
+}
+
+/* ========================================================= */
+/* 5. STYLES DES GRAPHIQUES (Visualizations/Prediction pages) */
+/* ========================================================= */
+.plot-container-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.plot-container {
+    border: 2px solid #ddd;
+    border-radius: 1rem;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    overflow: hidden;
+    width: 100%; 
+    height: 400px;
+    margin: 0 auto;
+}
+
+
+/* ========================================================= */
+/* 6. ÉLÉMENTS D'INTERFACE (Hidden, Loading, Marquee, Tooltip) */
+/* ========================================================= */
+.hidden, .hidden-form { 
+    display: none; 
+}
+
+.loading-spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border-left-color: #ffffff;
+    animation: spin 1s ease infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* --- Styles du Marquee (Texte Défilant) --- */
+.marquee-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100% - 200px); 
+    overflow: hidden;
+    white-space: nowrap;
+}
+.marquee-text {
+    display: inline-block;
+    padding-left: 100%; 
+    animation: marquee 15s linear infinite;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fce883; 
+}
+
+@keyframes marquee {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(-100%, 0); } 
+}
+
+@media (max-width: 768px) {
+    .marquee-container {
+        width: calc(100% - 120px);
+        display: none; 
+    }
+}
+ 
+/* --- Styles des Info-bulles (Tooltips) --- */
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    width: 300px;
+    background: linear-gradient(45deg, #a02583, #182c65); 
+    border: 1px solid #666;
+    color: #fff;
+    text-align: left;
+    padding: 12px 16px;
+    border-radius: 3rem; 
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); 
+    
+    position: absolute;
+    z-index: 20;
+    bottom: 125%; 
+    left: 50%;
+    margin-left: -150px; 
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    line-height: 1.5; 
+    transform: translateY(10px);
+}
+    
+.tooltip-text p {
+    margin-bottom: 6px; 
+    font-size: 0.9rem;
+}
+.tooltip-text p:last-child {
+    margin-bottom: 0;
+}
+
+.tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+} 
+
+/* Triangle pointeur */
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%; 
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #4a4a4a transparent transparent transparent;
+}
+
+/* Style pour masquer l'input de fichier par défaut (Upload page) */
+#file-input {
+    display: none;
+}
+ .rotating-text-container {
+        /* Positionnement du cercle à droite dans la nav */
+        position: absolute;
+        right: 1rem; 
+        top: 50%;
+        transform: translateY(-50%);
+        
+        /* Taille et forme du cercle fixe (ici, une pilule pour contenir le texte) */
+        width: 150px;
+        height: 50px; 
+        overflow: hidden; /* Cache le texte qui sort du conteneur */
+        border-radius: 40px; /* Forme de pilule/cercle pour l'encadrement */
+        background: rgba(204, 131, 252, 0.15); /* Légère transparence pour l'effet */
+        
+        display: flex;
+        align-items: center;
+        /* Assure que le texte défilant fonctionne bien sur desktop */
+        display: none; 
+    }
+
+    /* Afficher le conteneur uniquement sur les écrans moyens et grands */
+    @media (min-width: 768px) {
+        .rotating-text-container {
+            display: flex;
+        }
+    }
+
+    .rotating-content {
+        white-space: nowrap;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #cb3ece; /* Couleur du texte */
+        display: inline-block;
+        /* Animation pour le défilement continu */
+        animation: continuousScroll 20s linear infinite; 
+        /* On commence à 0% du décalage, pas à 100% de padding, pour un démarrage immédiat */
+        transform: translateX(0%); 
+    }
+
+    @keyframes continuousScroll {
+        /* Fait défiler le contenu doublé sur toute sa largeur */
+        0% { transform: translateX(0%); } 
+        100% { transform: translateX(-50%); } /* Défile de 50% de la largeur totale du contenu doublé */
+    }
+
+    .dot {
+        margin: 0 10px;
+        font-size: 1.2em;
+        opacity: 0.8;
+    }

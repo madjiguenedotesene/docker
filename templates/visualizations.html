@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📥Charger Données - Eurosmart Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inclure le script de style si vous en avez un (gardé du code original) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <div class="container mx-auto flex justify-between items-center relative h-10">
+        <!-- Logo - Côté Gauche -->
+        <a href="/" class="h-10 flex items-center z-10">
+             <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
+        </a>
+        
+        <!-- Nouveau Cercle de Texte Rotatif - Côté Droit -->
+        <div class="rotating-text-container">
+            <div class="rotating-content">
+                <!-- LE CONTENU EST DUPLIQUÉ CI-DESSOUS POUR UN EFFET DE BOUCLE SANS PAUSE -->
+               
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+                
+                
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+            </div>
+        </div>
+        
+    </div>
+</nav>
+
+
+    <main class="container mx-auto p-8 flex-grow mb-20"> 
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Visualisation des Données</h1>
+        <p class="text-white mb-8 text-center">Créez des graphiques interactifs pour explorer votre jeu de données.</p>
+        
+        <!-- CARTE 1: SÉLECTION DES PARAMÈTRES -->
+        <div id="selection-card" class="main-card p-6 md:p-10 text-center">
+            <h2 class="text-2xl font-bold mb-6 text-gray-700">Paramètres du Graphique</h2>
+
+            <form id="plot-form" class="space-y-4">
+                
+                <div class="flex flex-col md:flex-row md:space-x-4 md:space-y-0 space-y-4">
+                    
+                    <div class="flex-1">
+                        <label for="plotType" class="block text-left text-gray-700 font-bold mb-2">Type de graphique</label>
+                        <select id="plotType" name="plotType" class="w-full p-2 border border-gray-300 rounded-md">
+                            <option value="line">Lignes (Série Temporelle)</option>
+                            <option value="bar">Barres (Série Temporelle)</option>
+                            <option value="scatter">Nuage de points</option>
+                            <option value="box">Boîte à moustaches</option>
+                            <option value="distribution_histogram">Histogramme de distribution</option>
+                            <option value="pie">Secteurs</option>
+                        </select>
+                    </div>
+                    
+                    <div id="time-granularity-container" class="flex-1">
+                        <label for="timeGranularity" class="block text-left text-gray-700 font-bold mb-2">Granularité Temporelle</label>
+                        <select id="timeGranularity" name="timeGranularity" class="w-full p-2 border border-gray-300 rounded-md">
+                            <option value="raw">Données Brutes (Tout)</option>
+                            <option value="H">Par Heure (Moyenne)</option>
+                            <option value="D">Par Jour (Moyenne)</option>
+                            <option value="W">Par Semaine (Moyenne)</option>
+                            <option value="M">Par Mois (Moyenne)</option>
+                        </select>
+                    </div>
+
+                    <div id="x-col-container" class="flex-1">
+                        <label for="xCol" class="block text-left text-gray-700 font-bold mb-2">Axe X</label>
+                        <select id="xCol" name="xCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                </div>
+
+                <div class="flex flex-col md:flex-row md:space-x-4 md:space-y-0 space-y-4">
+                    
+                    <div id="y-col-container" class="flex-1">
+                        <label for="yCol" class="block text-left text-gray-700 font-bold mb-2">Axe Y</label>
+                        <select id="yCol" name="yCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                    <div id="color-col-container" class="flex-1">
+                        <label for="colorCol" class="block text-left text-gray-700 font-bold mb-2">Couleur (selon X ou Y)</label>
+                        <select id="colorCol" name="colorCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+
+                    <div id="color-type-container" class="flex-1">
+                        <label for="colorType" class="block text-left text-gray-700 font-bold mb-2">Type de couleur</label>
+                        <select id="colorType" name="colorType" class="w-full p-2 border border-gray-300 rounded-md">
+                            </select>
+                    </div>
+                    
+                    <div id="city-filter-container" class="flex-1">
+                        <label for="city-filter" class="block text-left text-gray-700 font-bold mb-2">Filtrer par Ville</label>
+                        <select id="city-filter" name="city-filter" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-gradient w-full md:w-auto mt-6">Générer le graphique ✨</button>
+            </form>
+        </div>
+        
+        <!-- CARTE 2: AFFICHAGE DU GRAPHIQUE -->
+        <div id="plot-card" class="main-card p-6 md:p-10 text-center mt-8 hidden">
+            <h2 class="text-2xl font-bold mb-6 text-gray-700">Résultat de la Visualisation</h2>
+
+            <div id="message-container" class="mt-4 text-center text-lg">Sélectionnez vos paramètres et cliquez sur 'Générer le graphique'.</div>
+
+            <div class="plot-container-wrapper">
+                <div id="plot-container" class="w-full h-96">
+                    <!-- Le graphique Plotly sera inséré ici -->
+                </div>
+            </div>
+
+            <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
+                <button id="downloadPlotBtn" class="btn-gradient">🖼️ Télécharger le graphique (PNG)</button>
+                <button onclick="window.location.href='/prediction-modeling'" class="btn-gradient">Aller à la page Prédiction</button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+        <div class="container mx-auto">
+            <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
+                <a href="/upload" class="transform hover:scale-110 transition duration-300">📥</a>
+                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧹</a>
+                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📊</a>
+                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮</a>
+            </div>
+            <p class="text-sm mt-4">&copy; 2026 Eurosmart Analytics. Tous droits réservés. ✨</p>
+            <p class="text-sm mt-2">
+                <span class="mr-2">📞</span>
+                <a href="tel:+33160626566" class="hover:underline">+33 1 60 62 65 66</a>
+            </p>
+        </div>
+    </footer>
+    <script>
+        const messageContainer = document.getElementById('message-container');
+        const plotForm = document.getElementById('plot-form');
+        const plotContainer = document.getElementById('plot-container');
+        const xColSelect = document.getElementById('xCol');
+        const yColSelect = document.getElementById('yCol');
+        const colorColSelect = document.getElementById('colorCol');
+        const colorTypeSelect = document.getElementById('colorType');
+        const plotTypeSelect = document.getElementById('plotType');
+        const cityFilterSelect = document.getElementById('city-filter');
+        const cityFilterContainer = document.getElementById('city-filter-container');
+        const redirectBtnContainer = document.getElementById('redirect-btn-container');
+        const downloadPlotBtn = document.getElementById('downloadPlotBtn');
+        const timeGranularitySelect = document.getElementById('timeGranularity'); 
+        
+        let allColumns = []; // Stocke toutes les colonnes récupérées
+        let timeColumns = []; // Stocke les colonnes de temps
+
+        // Mappage des noms de colonnes aux types de catégories pour la coloration
+        const columnTypeMapping = {
+           
+            'temp': { value: 'temperature', text: 'Température' }, 
+            'hum': { value: 'humidity', text: 'Humidité' }, 
+            'cov': { value: 'cov', text: 'Composés Organiques Volatils' },
+            'iqa': { value: 'iqa', text: 'Qualité de l\'Air' },
+            'pm': { value: 'pm', text: 'Particules Fines' },
+            'co2': { value: 'co2', text: 'CO₂' },
+            'nox': { value: 'nox', text: 'NOₓ' },
+            'lumiere': { value: 'light', text: 'Luminosité' }, 
+        };
+
+        const displayMessage = (msg, type) => {
+            messageContainer.textContent = msg;
+            messageContainer.style.color = (type === 'error') ? '#ff4d4d' : 'black';
+        };
+        
+        // Fonction utilitaire pour normaliser la chaîne (supprimer accents et espaces)
+        const normalizeString = (str) => {
+            if (!str) return '';
+            // Utilise NFD pour décomposer les caractères accentués, puis supprime les marques diacritiques
+            return str.toLowerCase()
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .replace(/\s/g, ''); // Supprime uniquement les espaces blancs
+        };
+
+
+        const fetchDataFrameInfo = async () => {
+            try {
+                const response = await fetch('/get_data_info');
+                const result = await response.json();
+                if (response.ok) {
+                    allColumns = result.data_info.columns;
+                    
+                    // Déterminer les colonnes de temps (on suppose celles qui contiennent 'date', 'heure', ou 'temps')
+                    // FIX: Ajout de 'temps' à la liste des mots-clés pour détecter les colonnes de temps.
+                    timeColumns = allColumns.filter(col => 
+                        normalizeString(col).includes('date') || 
+                        normalizeString(col).includes('heure') ||
+                        normalizeString(col).includes('temps')
+                    );
+                    
+                    // Colonnes non-temps pour les sélecteurs Y et X (pour les non-temporels)
+                    const nonTimeColumns = allColumns.filter(col => !timeColumns.includes(col));
+
+                    // Remplir le sélecteur Y en excluant le temps (Nouveau)
+                    populateSelect(yColSelect, nonTimeColumns);
+                    
+                    // Mettre à jour Axe X et les options de couleur
+                    updateXColOptions();
+                    // Initialiser les options de couleur basées sur les sélections initiales
+                    updateColorColOptions();
+
+                } else {
+                    displayMessage(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erreur lors de la récupération des colonnes:', error);
+                displayMessage('Une erreur est survenue lors du chargement des colonnes.', 'error');
+            }
+        };
+
+        const fetchUniqueCities = async () => {
+            try {
+                const response = await fetch('/get_unique_cities');
+                const result = await response.json();
+                if (response.ok && result.cities) {
+                    populateSelect(cityFilterSelect, result.cities, true, 'Toutes les villes');
+                } else {
+                    // Masquer le filtre si les villes ne sont pas disponibles
+                    cityFilterContainer.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Erreur lors de la récupération des villes:', error);
+                cityFilterContainer.style.display = 'none';
+            }
+        };
+
+        const populateSelect = (selectElement, options, includeEmpty = false, emptyText = 'Sélectionnez...') => {
+            selectElement.innerHTML = '';
+            if (includeEmpty) {
+                const emptyOption = document.createElement('option');
+                emptyOption.value = "";
+                emptyOption.textContent = emptyText;
+                selectElement.appendChild(emptyOption);
+            }
+            options.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option;
+                opt.textContent = option;
+                selectElement.appendChild(opt);
+            });
+        };
+
+        // Gère la sélection des options pour l'Axe X
+        const updateXColOptions = () => {
+            const plotType = plotTypeSelect.value;
+            const xColContainer = document.getElementById('x-col-container');
+            
+            // Les graphiques de type Ligne et Barre sont des séries temporelles
+            const isTimeSeries = ['line', 'bar'].includes(plotType);
+            
+            // Réinitialiser
+            xColSelect.innerHTML = '';
+            xColSelect.disabled = false;
+            
+            if (isTimeSeries) {
+                // Pour les séries temporelles, X est le temps
+                if (timeColumns.length > 0) {
+                    // Utiliser la première colonne de temps trouvée (Date/Heure)
+                    const timeColName = timeColumns[0];
+                    populateSelect(xColSelect, [timeColName], false, timeColName);
+                    xColSelect.disabled = true; // Empêcher l'utilisateur de changer l'axe X
+                    xColContainer.querySelector('label').textContent = 'Axe X (Temps)';
+                } else {
+                    // Cas d'erreur si aucune colonne de temps n'est trouvée pour la série temporelle
+                    populateSelect(xColSelect, ['Date/Heure non trouvée']);
+                    xColSelect.disabled = true;
+                    xColContainer.querySelector('label').textContent = 'Axe X (Temps)';
+                }
+                
+            } else {
+                // Pour les autres graphiques, X peut être n'importe quelle colonne.
+                // Exclusion complète du temps pour PIE, BOX, SCATTER
+                const nonTimeColumns = allColumns.filter(col => !timeColumns.includes(col));
+
+                if (['pie', 'box', 'scatter'].includes(plotType)) {
+                     // Exclure TOUTES les colonnes de temps de la sélection X
+                    populateSelect(xColSelect, nonTimeColumns);
+                } else {
+                    // Pour Histograms et autres, utiliser toutes les colonnes non-temps (déjà le cas, mais explicité)
+                    populateSelect(xColSelect, allColumns); 
+                }
+                
+                // Mettre à jour le label
+                xColContainer.querySelector('label').textContent = 'Axe X';
+            }
+            
+            // Mettre à jour les options de couleur
+            updateColorColOptions();
+        };
+        
+        //  Mettre à jour les options de la colonne 'Couleur'
+        const updateColorColOptions = () => {
+            const plotType = plotTypeSelect.value;
+            const xCol = xColSelect.value;
+            const yCol = yColSelect.value;
+            
+            const options = [];
+            options.push({ value: "", text: "Aucun" });
+
+            const isTimeSeriesPlot = ['line'].includes(plotType); 
+            
+            // 1. Ajouter l'Axe X comme option de couleur
+           
+            if (xCol && xCol !== 'Date/Heure non trouvée' && !isTimeSeriesPlot) {
+                 // S'assurer que X n'est pas une colonne de temps pour les non-temporels
+                if (!timeColumns.includes(xCol)) {
+                    options.push({ value: xCol, text: xCol });
+                }
+            }
+
+            // 2. Ajouter l'Axe Y comme option de couleur
+            // Y est une variable sélectionnée et est visible dans la configuration.
+            if (['scatter', 'bar', 'pie'].includes(plotType) && yCol) {
+                // Ajouter Y uniquement si elle est différente de X (pour éviter les doublons) et n'est pas une colonne de temps.
+                if (yCol !== xCol && !timeColumns.includes(yCol)) {
+                    options.push({ value: yCol, text: yCol });
+                }
+            }
+            
+            // Pour les secteurs (pie) et boîtes (box) et histogramme, X est la variable principale
+            if (['pie', 'box', 'distribution_histogram'].includes(plotType) && xCol && xCol !== 'Date/Heure non trouvée') {
+                const isXInOptions = options.some(opt => opt.value === xCol);
+                if (!isXInOptions && !timeColumns.includes(xCol)) {
+                    options.push({ value: xCol, text: xCol });
+                }
+            }
+
+            // Filtre les doublons et peuple le select
+            colorColSelect.innerHTML = '';
+            const uniqueOptions = new Map();
+            options.forEach(opt => uniqueOptions.set(opt.value, opt.text));
+
+            uniqueOptions.forEach((text, value) => {
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = text;
+                colorColSelect.appendChild(opt);
+            });
+
+            // S'assurer que le type de couleur est mis à jour immédiatement
+            updateColorTypeOptions();
+        };
+
+
+        const togglePlotOptions = () => {
+            const plotType = plotTypeSelect.value;
+            
+            // Mettre à jour l'Axe X en fonction du type de graphique
+            updateXColOptions();
+            
+            // Granularité temporelle est visible uniquement pour les séries temporelles (Line, Bar)
+            const isTimeSeries = ['line', 'bar'].includes(plotType);
+            document.getElementById('time-granularity-container').style.display = isTimeSeries ? 'block' : 'none';
+            
+            // Axe Y est caché pour les graphiques de secteurs, boîtes et histogrammes
+            document.getElementById('y-col-container').style.display = ['pie', 'box', 'distribution_histogram'].includes(plotType) ? 'none' : 'block';
+
+            // Masque la colonne de couleur pour les Box Plot, Histogrammes ET Lignes (Line seulement maintenant)
+        
+            const hideColor = ['distribution_histogram', 'box', 'line'].includes(plotType);
+            document.getElementById('color-col-container').style.display = hideColor ? 'none' : 'block';
+            document.getElementById('color-type-container').style.display = hideColor ? 'none' : 'block';
+            
+            // Le filtre par ville est conservé visible
+            document.getElementById('city-filter-container').style.display = 'block'; 
+            
+            // Mettre à jour les options de couleur basées sur les changements de X/Y/Type de graphique
+            updateColorColOptions();
+        };
+
+        const updateColorTypeOptions = () => {
+            const selectedCol = colorColSelect.value;
+            colorTypeSelect.innerHTML = '';
+            
+            const emptyOption = document.createElement('option');
+            emptyOption.value = "none";
+            emptyOption.textContent = "Aucun";
+            colorTypeSelect.appendChild(emptyOption);
+
+            if (selectedCol) {
+                // Normalise la chaîne pour la détection du type de couleur
+                const normalizedCol = normalizeString(selectedCol);
+                
+                // Cherche la clé correspondante dans la colonne normalisée
+                const colKey = Object.keys(columnTypeMapping).find(key => normalizedCol.includes(key));
+                
+                if (colKey) {
+                    const mappedType = columnTypeMapping[colKey];
+                    const opt = document.createElement('option');
+                    opt.value = mappedType.value;
+                    opt.textContent = mappedType.text;
+                    colorTypeSelect.appendChild(opt);
+                    
+                    //Force la sélection du type de couleur correspondant
+                    colorTypeSelect.value = mappedType.value;
+                }
+            } else {
+                 // Si "Aucun" est sélectionné, s'assurer que le type de couleur est aussi "Aucun"
+                 colorTypeSelect.value = "none";
+            }
+        };
+
+       
+        plotForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Rendre la carte d'affichage visible au début de la soumission
+            document.getElementById('plot-card').classList.remove('hidden');
+
+            const plotType = plotTypeSelect.value;
+            const xCol = xColSelect.value;
+            
+            // Les types de graphiques pour lesquels les options de couleur sont masquées et doivent être forcées à vide
+            const plotsWithoutColorGrouping = ['distribution_histogram', 'box', 'line'];
+
+            // Assurer que YCol est vide pour les Box Plots, Histograms et Secteurs 
+            const yCol = ['pie', 'box', 'distribution_histogram'].includes(plotType) ? "" : yColSelect.value;
+            
+            // Assurer que ColorCol et ColorType sont vides pour les graphiques sans option de couleur visible (Line, Box, Histogram)
+            const colorCol = plotsWithoutColorGrouping.includes(plotType) ? "" : colorColSelect.value;
+            const colorType = plotsWithoutColorGrouping.includes(plotType) ? "none" : colorTypeSelect.value;
+
+            const city = cityFilterSelect.value;
+            const timeGranularity = timeGranularitySelect.value; 
+            
+            // axe X
+            if (!xCol || xCol === 'Date/Heure non trouvée') {
+                displayMessage('Veuillez sélectionner des données valides pour l\'axe X.', 'error');
+                return;
+            }
+            // Validation pour l'Axe Y pour les graphiques qui en ont besoin
+            if (['scatter', 'bar', 'line'].includes(plotType) && !yCol) {
+                displayMessage('Veuillez sélectionner une colonne pour l\'axe Y.', 'error');
+                return;
+            }
+            
+            if (['pie'].includes(plotType) && !colorCol) {
+                displayMessage('Veuillez sélectionner une colonne pour le graphique de secteur.', 'error');
+                return;
+            }
+
+            displayMessage('Génération du graphique...', 'info');
+           
+           // plotContainer.innerHTML = '<p class="text-gray-600 text-center">Chargement du graphique...</p>';
+
+            try {
+                const response = await fetch('/generate_plot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        plotType,
+                        xCol,
+                        yCol, 
+                        colorCol, 
+                        colorType, 
+                        city,
+                        timeGranularity 
+                    }),
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const plotData = JSON.parse(result.plot_json);
+                    
+                    Plotly.newPlot('plot-container', plotData.data, plotData.layout, { responsive: true });
+                    displayMessage('Graphique généré avec succès ! 🎉', 'success');
+                    redirectBtnContainer.classList.remove('hidden');
+
+                } else {
+                    displayMessage(result.error, 'error');
+                    plotContainer.innerHTML = '<p class="text-gray-600 text-center">Échec de la génération du graphique. 💔</p>';
+                }
+            } catch (error) {
+                console.error('Erreur lors de la génération du graphique:', error);
+                displayMessage('Une erreur inattendue est survenue lors de la génération du graphique.', 'error');
+            }
+        });
+
+        downloadPlotBtn.addEventListener('click', () => {
+            Plotly.downloadImage('plot-container', { format: 'png', filename: 'mon_graphique' });
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDataFrameInfo();
+            fetchUniqueCities();
+            togglePlotOptions();
+            
+        });
+
+        // Événements pour déclencher les mises à jour de couleur
+        plotTypeSelect.addEventListener('change', togglePlotOptions);
+        xColSelect.addEventListener('change', updateColorColOptions);
+        yColSelect.addEventListener('change', updateColorColOptions);
+        colorColSelect.addEventListener('change', updateColorTypeOptions);
+    </script>
+</body>
+</html>

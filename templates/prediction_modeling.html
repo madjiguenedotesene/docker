@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔮Prediction - Eurosmart Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <div class="container mx-auto flex justify-between items-center relative h-10">
+        <!-- Logo - Côté Gauche -->
+        <a href="/" class="h-10 flex items-center z-10">
+             <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
+        </a>
+        
+        <!-- Nouveau Cercle de Texte Rotatif - Côté Droit -->
+        <div class="rotating-text-container">
+            <div class="rotating-content">
+                <!-- LE CONTENU EST DUPLIQUÉ CI-DESSOUS POUR UN EFFET DE BOUCLE SANS PAUSE -->
+               
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+                
+                
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+            </div>
+        </div>
+        
+    </div>
+</nav>
+
+
+    <main class="container mx-auto p-8 flex-grow">
+        
+        <div class="main-card p-6 md:p-10 text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-gray-800">Prédiction et Modélisation</h1>
+            <p class="text-gray-600 mb-8">Entraînez un modèle de régression pour prédire une variable en fonction des autres.</p>
+            
+            <div class="mb-8">
+                <button id="getCorrelationBtn" class="btn-gradient flex items-center justify-center mx-auto">
+                    <span id="correlation-text">Analyser les corrélations</span>
+                    <span id="correlation-spinner" class="loading-spinner ml-2 hidden"></span>
+                </button>
+            </div>
+
+            <form id="prediction-form" class="space-y-4 pt-8">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">Prédiction</h2>
+                <p class="text-gray-600">Sélectionnez la variable cible que vous souhaitez prédire et les variables explicatives à utiliser.</p>
+                <div class="flex flex-col md:flex-row md:space-x-4 md:space-y-0 space-y-4">
+                    <div class="flex-1">
+                        <label for="targetCol" class="block text-left text-gray-700 font-bold mb-2">Variable Cible</label>
+                        <select id="targetCol" name="targetCol" class="w-full p-2 border border-gray-300 rounded-md text-gray-900"></select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="explanatoryCols" class="block text-left text-gray-700 font-bold mb-2">Variables Explicatives</label>
+                        <select id="explanatoryCols" name="explanatoryCols" multiple class="w-full p-2 border border-gray-300 rounded-md h-32 text-gray-900"></select>
+                    </div>
+                </div>
+                <button type="submit" id="train-btn" class="btn-gradient w-full md:w-auto flex items-center justify-center">
+                    <span id="train-text">Entraîner et Prédire</span>
+                    <span id="train-spinner" class="loading-spinner ml-2 hidden"></span>
+                </button>
+            </form>
+
+            <div id="message-container" class="mt-4 text-center text-lg"></div>
+        </div>
+
+        <div id="correlation-section" class="main-card p-6 md:p-10 text-center mb-8 hidden">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Matrice de Corrélation</h2>
+            <p class="text-gray-600 mb-4">La matrice de corrélation montre les relations entre les variables. Plus la valeur est proche de 1 ou -1, plus la corrélation est forte.</p>
+            <div id="correlation-plot" class="plot-container mx-auto"></div>
+            <button id="downloadCorrelationBtn" class="btn-gradient mt-4">🖼️ Télécharger la matrice</button>
+        </div>
+
+        <div id="results-section" class="main-card p-6 md:p-10 text-center hidden">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Résultats de la Prédiction</h2>
+            <div id="prediction-metrics" class="bg-gray-100 p-6 rounded-2xl mb-8 text-left text-gray-800">
+                </div>
+            <div id="prediction-plot" class="plot-container mx-auto"></div>
+            
+            <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
+                <button id="downloadPredictionBtn" class="btn-gradient">🖼️ Télécharger le graphique</button>
+                <button onclick="window.location.href='/'" class="btn-gradient">Retour à l'accueil</button>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+        <div class="container mx-auto">
+            <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
+                <a href="/upload" class="transform hover:scale-110 transition duration-300">📥</a>
+                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧹</a>
+                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📊</a>
+                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮</a>
+            </div>
+            <p class="text-sm mt-4">&copy; 2026 Eurosmart Analytics. Tous droits réservés. ✨</p>
+            <p class="text-sm mt-2">
+                <span class="mr-2">📞</span>
+                <a href="tel:+33160626566" class="hover:underline">+33 1 60 62 65 66</a>
+            </p>
+        </div>
+    </footer>
+    <script>
+        const getCorrelationBtn = document.getElementById('getCorrelationBtn');
+        const correlationSection = document.getElementById('correlation-section');
+        const correlationPlot = document.getElementById('correlation-plot');
+        const downloadCorrelationBtn = document.getElementById('downloadCorrelationBtn');
+        const targetColSelect = document.getElementById('targetCol');
+        const explanatoryColsSelect = document.getElementById('explanatoryCols');
+        const predictionForm = document.getElementById('prediction-form');
+        const predictionMetricsDiv = document.getElementById('prediction-metrics');
+        const predictionPlotDiv = document.getElementById('prediction-plot');
+        const resultsSection = document.getElementById('results-section');
+        const messageContainer = document.getElementById('message-container');
+        const trainBtn = document.getElementById('train-btn');
+        const trainText = document.getElementById('train-text');
+        const trainSpinner = document.getElementById('train-spinner');
+        const redirectBtnContainer = document.getElementById('redirect-btn-container');
+        const downloadPredictionBtn = document.getElementById('downloadPredictionBtn');
+        const correlationText = document.getElementById('correlation-text');
+        const correlationSpinner = document.getElementById('correlation-spinner');
+
+        let allColumns = [];
+        // Mots-clés des colonnes cibles autorisées (insensible à la casse)
+        const targetKeywords = ['température', 'humidité'];
+        // Mots-clés des colonnes à exclure de manière permanente (insensible à la casse)
+        const permanentExclusionsKeywords = [
+            'le point rose', 'la diff', 'le mois', 'la ville', 
+            'time', 'date', 'heure', // Exclusions temporelles
+            'pm', 'cov', 'iqa', 'co2', 'nox' , 'lumière'// Exclusions de la qualité de l'air
+        ];
+
+
+        const displayMessage = (msg, type) => {
+            messageContainer.textContent = msg;
+            messageContainer.style.color = (type === 'error') ? '#ff4d4d' : 'black';
+        };
+
+        const fetchAndPopulateColumns = async () => {
+            try {
+                // Appel de la route Python pour obtenir les colonnes
+                const response = await fetch('/get_data_columns');
+                const result = await response.json();
+                if (response.ok) {
+                    allColumns = result.columns;
+                    
+                    // Filtrer les colonnes pour n'afficher que les cibles autorisées
+                    const filteredTargets = allColumns.filter(col => 
+                        targetKeywords.some(keyword => col.toLowerCase().includes(keyword))
+                    );
+
+                    populateSelect(targetColSelect, filteredTargets);
+
+                    // Définir 'Température' comme variable cible par défaut si elle existe
+                    const defaultTarget = filteredTargets.find(col => col.toLowerCase().includes('température'));
+                    if (defaultTarget) {
+                        targetColSelect.value = defaultTarget;
+                    } else if (filteredTargets.length > 0) {
+                        targetColSelect.value = filteredTargets[0]; // Sinon, prendre la première
+                    }
+
+                    updateExplanatoryVariables();
+                } else {
+                    displayMessage(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erreur lors de la récupération des colonnes:', error);
+                displayMessage('Une erreur est survenue lors du chargement des colonnes.', 'error');
+            }
+        };
+
+        const populateSelect = (selectElement, options) => {
+            selectElement.innerHTML = '';
+            options.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option;
+                opt.textContent = option;
+                selectElement.appendChild(opt);
+            });
+        };
+
+        const updateExplanatoryVariables = () => {
+            const targetCol = targetColSelect.value;
+            
+            // Logique de filtrage des colonnes explicatives
+            const explanatoryColumns = allColumns.filter(col => {
+                const lowerCol = col.toLowerCase();
+                
+                // 1. Exclure la variable cible
+                if (col === targetCol) {
+                    return false;
+                }
+                
+                // 2. Exclure les colonnes permanentes (insensible à la casse et par inclusion de mot-clé)
+                const isPermanentlyExcluded = permanentExclusionsKeywords.some(keyword => lowerCol.includes(keyword));
+                
+                return !isPermanentlyExcluded;
+            });
+            
+            // Les variables explicatives sont toutes les colonnes qui ne sont ni la cible, ni des colonnes à exclure
+            populateSelect(explanatoryColsSelect, explanatoryColumns);
+            
+            // Sélectionner toutes les variables explicatives par défaut
+            Array.from(explanatoryColsSelect.options).forEach(option => {
+                option.selected = true;
+            });
+        };
+
+        const fetchCorrelationMatrix = async () => {
+            correlationText.classList.add('hidden');
+            correlationSpinner.classList.remove('hidden');
+            getCorrelationBtn.disabled = true;
+
+            displayMessage('Génération de la matrice de corrélation...', 'info');
+            correlationSection.classList.add('hidden'); // Cacher la carte avant de charger
+            try {
+                // Appel de la route Python pour la matrice de corrélation
+                const response = await fetch('/get_correlation_matrix');
+                const result = await response.json();
+                if (response.ok) {
+                    const plotData = JSON.parse(result.plot_json);
+                    Plotly.newPlot('correlation-plot', plotData.data, plotData.layout, { responsive: true });
+                    correlationSection.classList.remove('hidden'); // Afficher la carte après chargement
+                    displayMessage('Matrice de corrélation générée avec succès !', 'success');
+                } else {
+                    displayMessage(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erreur lors de la génération de la matrice de corrélation:', error);
+                displayMessage('Une erreur inattendue est survenue.', 'error');
+            } finally {
+                correlationText.classList.remove('hidden');
+                correlationSpinner.classList.add('hidden');
+                getCorrelationBtn.disabled = false;
+            }
+        };
+
+        const trainAndPredict = async () => {
+            const targetCol = targetColSelect.value;
+            const featureCols = Array.from(explanatoryColsSelect.options)
+                                         .filter(option => option.selected)
+                                         .map(option => option.value);
+
+            if (!targetCol || featureCols.length === 0) {
+                displayMessage('Veuillez sélectionner au moins une variable cible et une variable explicative.', 'error');
+                return;
+            }
+
+            trainBtn.disabled = true;
+            trainText.classList.add('hidden');
+            trainSpinner.classList.remove('hidden');
+            displayMessage('Entraînement du modèle...', 'info');
+            resultsSection.classList.add('hidden'); // Cacher la carte avant de charger
+
+            try {
+                // Appel de la route Python pour l'entraînement et la prédiction
+                const response = await fetch('/train_predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ targetCol: targetCol, featureCols: featureCols }),
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Les données de prédiction peuvent être utilisées pour des graphiques futurs
+                    const plotData = {
+                      data: [
+                        {
+                          x: result.predictions_gb.map(p => p.time),
+                          y: result.predictions_gb.map(p => p.value),
+                          mode: 'lines',
+                          name: 'Prédictions (Gradient Boosting)',
+                          line: { color: 'rgb(255, 105, 180)', width: 2 }
+                        },
+                         {
+                          x: result.predictions_rf.map(p => p.time),
+                          y: result.predictions_rf.map(p => p.value),
+                          mode: 'lines',
+                          name: 'Prédictions (Random Forest)',
+                          line: { color: 'rgb(75, 82, 255)', width: 2 }
+                        }
+                      ],
+                      layout: {
+                        title: 'Prédictions des prochaines heures',
+                        xaxis: { title: 'Date et Heure' },
+                        yaxis: { title: targetCol },
+                        legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'right', x: 1 }
+                      }
+                    };
+
+                    Plotly.newPlot('prediction-plot', plotData.data, plotData.layout, { responsive: true });
+                    
+                    predictionMetricsDiv.innerHTML = `
+                        <p class="mb-2"><strong>Random Forest R²:</strong> ${result.results['Random Forest'].r2.toFixed(4)}</p>
+                        <p class="mb-2"><strong>Random Forest MSE:</strong> ${result.results['Random Forest'].mse.toFixed(4)}</p>
+                         <p class="mb-2"><strong>Gradient Boosting R²:</strong> ${result.results['Gradient Boosting'].r2.toFixed(4)}</p>
+                        <p class="mb-2"><strong>Gradient Boosting MSE:</strong> ${result.results['Gradient Boosting'].mse.toFixed(4)}</p>
+                    `;
+                    
+                    displayMessage('Modèles entraînés et prédictions générées avec succès ! 🎉', 'success');
+                    resultsSection.classList.remove('hidden'); // Afficher la carte après chargement
+                    redirectBtnContainer.classList.remove('hidden');
+                    downloadPredictionBtn.classList.remove('hidden');
+
+                } else {
+                    displayMessage(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erreur lors de l\'entraînement du modèle:', error);
+                displayMessage('Une erreur inattendue est survenue lors de l\'entraînement du modèle. Le jeu de données est peut-être trop petit.', 'error');
+            } finally {
+                trainBtn.disabled = false;
+                trainText.classList.remove('hidden');
+                trainSpinner.classList.add('hidden');
+            }
+        };
+
+        downloadCorrelationBtn.addEventListener('click', () => {
+            Plotly.downloadImage('correlation-plot', { format: 'png', filename: 'matrice_correlation' });
+        });
+
+        downloadPredictionBtn.addEventListener('click', () => {
+            Plotly.downloadImage('prediction-plot', { format: 'png', filename: 'graphique_prediction' });
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAndPopulateColumns();
+            getCorrelationBtn.addEventListener('click', fetchCorrelationMatrix);
+            predictionForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                trainAndPredict();
+            });
+            targetColSelect.addEventListener('change', updateExplanatoryVariables);
+        });
+    </script>
+</body>
+</html>

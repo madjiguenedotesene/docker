@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📥Charger Données - Eurosmart Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <div class="container mx-auto flex justify-between items-center relative h-10">
+        <!-- Logo - Côté Gauche -->
+        <a href="/" class="h-10 flex items-center z-10">
+             <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
+        </a>
+        
+        <!-- Nouveau Cercle de Texte Rotatif - Côté Droit -->
+        <div class="rotating-text-container">
+            <div class="rotating-content">
+                <!-- LE CONTENU EST DUPLIQUÉ CI-DESSOUS POUR UN EFFET DE BOUCLE SANS PAUSE -->
+               
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+                
+                
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+            </div>
+        </div>
+        
+    </div>
+</nav>
+
+    <main class="container mx-auto p-8 flex-grow">
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Charger vos Données</h1>
+        <p class="text-white mb-8 text-center">Téléchargez un ou plusieurs fichiers CSV et prévisualisez-les pour la préparation.</p>
+
+        <!-- CARTE 1: FORMULAIRE DE TÉLÉCHARGEMENT -->
+        <div class="main-card p-6 md:p-10 text-center">
+            <h2 class="text-2xl font-bold mb-6 text-gray-700">1. Sélectionner et Charger</h2>
+            
+            <form id="upload-form" class="space-y-6">
+                <div>
+                    <label for="file-input" class="block text-left text-gray-700 font-bold mb-2">Sélectionner un ou plusieurs fichiers CSV</label>
+                    <label for="file-input" class="btn-gradient w-full md:w-auto flex items-center justify-center space-x-2 cursor-pointer">
+                        <span>Sélectionner des fichiers</span>
+                    </label>
+                    <input type="file" id="file-input" name="file" multiple class="w-full text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" accept=".csv">
+                </div>
+                
+                <div id="file-list-container" class="mt-4 hidden">
+                    <ul id="file-list" class="space-y-2 text-left"></ul>
+                </div>
+
+                <div class="flex items-center justify-center space-x-2">
+                    <input type="checkbox" id="header_row" name="header_row" class="form-checkbox text-purple-600 rounded" checked>
+                    <label for="header_row" class="text-gray-700 font-bold">Mes fichiers ont un en-tête</label>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" id="upload-btn" class="btn-gradient w-full md:w-auto flex items-center justify-center space-x-2">
+                        <span id="upload-text">Charger et Prévisualiser</span>
+                        <div id="upload-spinner" class="hidden w-4 h-4 border-2 border-white border-opacity-50 rounded-full animate-spin"></div>
+                    </button>
+                </div>
+            </form>
+
+            <div id="message-container" class="mt-4 text-center text-lg"></div>
+
+        </div>
+
+        <!-- CARTE 2: PRÉVISUALISATION DES DONNÉES (Initialement cachée) -->
+        <div id="df-preview-card" class="main-card p-6 md:p-10 text-center mt-8 hidden">
+            <h2 class="text-2xl font-bold mb-6 text-gray-700">2. Prévisualisation du Jeu de Données</h2>
+            
+            <div id="df-info" class="text-left text-gray-700 mb-4 font-semibold"></div>
+            
+            <div class="table-preview">
+                <div id="df-preview" class="text-sm">
+                    <!-- Le tableau de données sera inséré ici -->
+                </div>
+            </div>
+
+            <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
+                <a href="/data-preparation" class="btn-gradient w-full md:w-auto">Aller à la page Préparation (Nettoyage) →</a>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+        <div class="container mx-auto">
+            <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
+                <a href="/upload" class="transform hover:scale-110 transition duration-300">📥</a>
+                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧹</a>
+                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📊</a>
+                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮</a>
+            </div>
+            <p class="text-sm mt-4">&copy; 2026 Eurosmart Analytics. Tous droits réservés. ✨</p>
+            <p class="text-sm mt-2">
+                <span class="mr-2">📞</span>
+                <a href="tel:+33160626566" class="hover:underline">+33 1 60 62 65 66</a>
+            </p>
+        </div>
+    </footer>
+    <script>
+        const uploadForm = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-input');
+        const fileListContainer = document.getElementById('file-list-container');
+        const fileList = document.getElementById('file-list');
+        const uploadBtn = document.getElementById('upload-btn');  
+        const uploadText = document.getElementById('upload-text');
+        const uploadSpinner = document.getElementById('upload-spinner');
+        
+        // Nouvelle carte pour la prévisualisation
+        const previewCard = document.getElementById('df-preview-card'); 
+        
+        const redirectBtnContainer = document.getElementById('redirect-btn-container');    
+        const messageContainer = document.getElementById('message-container');
+        const previewDiv = document.getElementById('df-preview');
+        const infoDiv = document.getElementById('df-info');  
+
+        // Tableau pour stocker les objets File
+        let uploadedFiles = [];
+        
+        const displayMessage = (msg, type) => {
+            messageContainer.textContent = msg;
+            messageContainer.style.color = (type === 'error') ? '#ff4d4d' : '#4b52ff';
+        };
+    
+        const renderFileList = () => {
+            fileList.innerHTML = '';
+            if (uploadedFiles.length > 0) {
+                fileListContainer.classList.remove('hidden');
+                uploadedFiles.forEach((file, index) => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'flex items-center justify-between p-2 bg-gray-100 text-gray-700 rounded-md';
+        
+                    const fileNameSpan = document.createElement('span');
+                    fileNameSpan.className = 'file-name flex-grow truncate';  
+                    fileNameSpan.textContent = file.name;
+        
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'flex items-center space-x-2 ml-4';
+        
+                    const renameBtn = document.createElement('button');
+                    renameBtn.innerHTML = '✏️';
+                    renameBtn.className = 'text-gray-500 hover:text-blue-500 transition-colors duration-200';
+                    renameBtn.onclick = (e) => {
+                        e.preventDefault();
+                        const newName = prompt(`Renommer ${file.name}:`);
+                        if (newName !== null && newName.trim() !== '') {
+                            const newFile = new File([file], newName, { type: file.type });
+                            uploadedFiles[index] = newFile;
+                            renderFileList();
+                        }
+                    };
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.className = 'text-gray-500 hover:text-red-500 transition-colors duration-200';
+                    deleteBtn.onclick = (e) => {
+                        e.preventDefault();
+                        uploadedFiles.splice(index, 1);
+                        renderFileList();
+                        if (uploadedFiles.length === 0) {
+                            previewCard.classList.add('hidden');
+                            redirectBtnContainer.classList.add('hidden');
+                            displayMessage('');
+                        }
+                    };
+                    
+                    actionsDiv.appendChild(renameBtn);
+                    actionsDiv.appendChild(deleteBtn);
+                    listItem.appendChild(fileNameSpan);
+                    listItem.appendChild(actionsDiv);
+                    fileList.appendChild(listItem);
+                });
+            } else {
+                fileListContainer.classList.add('hidden');
+            }
+        };          
+            
+        fileInput.addEventListener('change', (event) => {
+            uploadedFiles = Array.from(event.target.files);
+            renderFileList();
+        });
+            
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (uploadedFiles.length === 0) {
+                displayMessage('Veuillez sélectionner au moins un fichier à charger.', 'error');
+                return;
+            }
+                        
+            const formData = new FormData();
+            uploadedFiles.forEach(file => {
+                formData.append('file[]', file);
+            });
+            // Ajouter la valeur de la case à cocher 'header_row'
+            const headerCheckbox = document.getElementById('header_row');
+            if (headerCheckbox.checked) {
+                formData.append('header_row', 'on');
+            }
+            
+            uploadBtn.disabled = true;
+            uploadText.classList.add('hidden');
+            uploadSpinner.classList.remove('hidden');
+            displayMessage('Téléchargement en cours...', 'info');
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Afficher les informations et la prévisualisation dans la nouvelle carte
+                    previewDiv.innerHTML = result.preview;
+                    infoDiv.innerHTML = `
+                        <p>Lignes: ${result.data_info.rows}</p>
+                        <p>Colonnes: ${result.data_info.columns.length}</p>
+                    `;
+                    
+                    // Rendre la carte de prévisualisation visible
+                    previewCard.classList.remove('hidden'); 
+                    redirectBtnContainer.classList.remove('hidden');
+                    displayMessage('Fichier(s) chargé(s) et prévisualisé(s) avec succès ! 🎉', 'success');
+            
+                } else {
+                    previewCard.classList.add('hidden'); // Cacher en cas d'erreur
+                    redirectBtnContainer.classList.add('hidden');
+                    displayMessage(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Erreur lors du téléchargement:', error);
+                previewCard.classList.add('hidden'); // Cacher en cas d'erreur
+                redirectBtnContainer.classList.add('hidden');
+                displayMessage('Une erreur inattendue est survenue lors du téléchargement.', 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadText.classList.remove('hidden');
+                uploadSpinner.classList.add('hidden');
+            }
+        });
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Pas d'initialisation spécifique au chargement de la page ici.
+        });
+
+    </script>
+</body>
+</html>

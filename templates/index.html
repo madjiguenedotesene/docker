@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenue - Eurosmart Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="flex flex-col min-h-screen">
+
+   <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <div class="container mx-auto flex justify-between items-center relative h-10">
+        <!-- Logo - Côté Gauche -->
+        <a href="/" class="h-10 flex items-center z-10">
+             <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
+        </a>
+        
+        <!-- Nouveau Cercle de Texte Rotatif - Côté Droit -->
+        <div class="rotating-text-container">
+            <div class="rotating-content">
+                <!-- LE CONTENU EST DUPLIQUÉ CI-DESSOUS POUR UN EFFET DE BOUCLE SANS PAUSE -->
+               
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+                
+                
+                <span>CHARGER</span>
+                <span class="dot">•</span>
+                <span>NETTOYER</span>
+                <span class="dot">•</span>
+                <span>VISUALISER</span>
+                <span class="dot">•</span>
+                <span>PRÉDIRE</span>
+                <span class="dot">•</span>
+            </div>
+        </div>
+        
+    </div>
+</nav>
+
+    <main class="container mx-auto p-8 flex-grow">
+        <div id="main-content">
+            
+            <h1 id="welcome-message" class="text-4xl md:text-5xl font-extrabold text-center mb-6">Bienvenue dans votre outil d'analyse de données</h1>
+            <p class="text-lg text-white text-center mb-12">Transformez vos données en informations stratégiques avec notre plateforme d'analyse et de visualisation. Simple, rapide et puissant.</p>
+            
+            <div class="text-center">
+                <a href="/upload-data" class="btn-gradient inline-block px-8 py-3 rounded-full text-lg shadow-xl hover:scale-105 transition-transform duration-300">
+                    Commencer l'analyse 🚀
+                </a>
+            </div>
+
+            <div class="text-center mt-12">
+                <h2 class="text-3xl font-bold mb-4">Comment utiliser l'outil ?</h2>
+                <p class="text-white text-lg mb-8">Suivez ces étapes simples pour transformer vos données.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    
+                    <!-- ÉTAPE 1: CHARGER -->
+                    <div class="p-6 main-card help-item text-center tooltip-container">
+                        <span class="text-5xl">📁</span>
+                        <h3 class="text-xl font-semibold mb-2">Charger</h3>
+                        
+                        <span class="tooltip-text">
+                            <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
+                            <p>Cliquez sur "Commencer l'analyse" puis sur l'icône de téléchargement. Sélectionnez vos fichiers (CSV, XLSX) à importer.</p>
+                            <hr class="border-gray-600 my-2">
+                            <p class="font-bold mb-1 text-yellow-300">Pourquoi cette étape ?</p>
+                            <p>C'est le point de départ. Une fois chargés, l'outil analyse automatiquement la structure des données et leur type, vous préparant pour le nettoyage.</p>
+                        </span>
+                    </div>
+                    
+                    <!-- ÉTAPE 2: NETTOYER -->
+                    <div class="p-6 main-card help-item text-center tooltip-container">
+                        <span class="text-5xl">🧼</span>
+                        <h3 class="text-xl font-semibold mb-2">Nettoyer</h3>
+                
+                        <span class="tooltip-text">
+                            <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
+                            <p>Après le chargement, allez à la page "Nettoyage". Utilisez les boutons pour visualiser la moyenne, les villes et les statistiques descriptives.</p>
+                            <hr class="border-gray-600 my-2">
+                            <p class="font-bold mb-1 text-yellow-300">Concepts Clés</p>
+                            <p>Le Point de Rosée est crucial pour l'humidité. La différence T-PR (Température moins Point de Rosée) est un indicateur de la saturation de l'air. Une petite différence signifie beaucoup d'humidité.</p>
+                        </span>
+                    </div>
+
+                    <!-- ÉTAPE 3: PRÉVISUALISER (VISUALISATION, COULEURS) -->
+                    <div class="p-6 main-card help-item text-center tooltip-container">
+                        <span class="text-5xl">📈</span>
+                        <h3 class="text-xl font-semibold mb-2">Prévisualiser</h3>
+                        
+                        <span class="tooltip-text">
+                            <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
+                            <p>Allez à la page Visualisation. Choisissez les colonnes que vous voulez comparer (ex: Température vs Humidité) pour générer des graphiques.</p>
+                            <hr class="border-gray-600 my-2">
+                            <p class="font-bold mb-1 text-yellow-300">Concepts Clés</p>
+                            <p>Les Couleurs et Catégories sont utilisées pour segmenter vos données, par exemple, afficher les points de données par ville ou par type d'événement pour identifier des tendances spécifiques.</p>
+                        </span>
+                    </div>
+
+                    <!-- ÉTAPE 4: PRÉDIRE (RÉGRESSION, R² & CORRÉLATION) -->
+                    <div class="p-6 main-card help-item text-center tooltip-container">
+                        <span class="text-5xl">🔮</span>
+                        <h3 class="text-xl font-semibold mb-2">Prédire</h3>
+                       
+                        <span class="tooltip-text">
+                            <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
+                            <p>Allez à la page Modélisation. Sélectionnez une colonne cible (la variable que vous voulez prédire, ex: "Température") et lancez le modèle pour obtenir une prédiction.</p>
+                            <hr class="border-gray-600 my-2">
+                            <p class="font-bold mb-1 text-yellow-300">Concepts Clés</p>
+                            <p>Le Coefficient R² (ou Coefficient de Détermination) est le score que vous devez surveiller. Un R² de 1 (ou 100%) signifie que votre modèle prédit parfaitement les résultats. Plus il est proche de 1, meilleur est votre modèle.</p>
+                            <p>La Corrélation mesure la relation entre deux variables : proche de +1 signifie qu'elles augmentent ensemble ; proche de -1 signifie que l'une augmente pendant que l'autre diminue.</p>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </main>
+    
+    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+        <div class="container mx-auto">
+            <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
+                <a href="/upload-data" class="transform hover:scale-110 transition duration-300">📥</a>
+                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧹</a>
+                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📊</a>
+                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮</a>
+            </div>
+            <p class="text-sm mt-4">&copy; 2026 Eurosmart Analytics. Tous droits réservés. ✨</p>
+            <p class="text-sm mt-2">
+                <span class="mr-2">📞</span>
+                <a href="tel:+33160626566" class="hover:underline">+33 1 60 62 65 66</a>
+            </p>
+        </div>
+    </footer>
+    
+</body>
+</html>
