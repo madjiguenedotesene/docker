@@ -843,4 +843,9 @@ def train_predict():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # 1. Lit la variable d'environnement 'PORT' fournie par Render.
+    # 2. Si elle n'existe pas (en local), utilise le port 5000 par défaut.
+    port = int(os.environ.get('PORT', 5000))
+    
+    # 3. Utilise '0.0.0.0' comme hôte pour accepter les connexions externes de Render.
+    app.run(debug=True, host='0.0.0.0', port=port)
