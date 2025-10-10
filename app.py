@@ -13,10 +13,19 @@ import uuid
 import plotly.graph_objects as go
 from datetime import timedelta
 import math
+#from google import genai
+#from google.genai.errors import APIError # Correction ici: utilise genai.errors
+# ----------------------------------------
+#from google.generativeai import types
+from datetime import datetime
+from meteostat import Point, Hourly
+from geopy.geocoders import Nominatim
+
+
 
 # Configuration de l'application Flask
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'votre_cle_secrete_ici'
+app.config['SECRET_KEY'] = 'ma_cle_secrete'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'output'
 app.config['DATA_FOLDER'] = 'data'
@@ -32,13 +41,12 @@ for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.con
 # 🛠️ FONCTIONS UTILITAIRES GLOBALES 🛠️
 # ==============================================================================
 def is_numeric_or_datetime(series):
-    """Vérifie si la colonne est de type numérique ou date/heure (pour les graphiques)."""
+    """Vérifie si la colonne est de type numérique ou date/heure"""
     return pd.api.types.is_numeric_dtype(series) or pd.api.types.is_datetime64_any_dtype(series)
         
 
 # ==============================================================================
-# 🎨 DÉFINITION DES CARTES DE COULEURS ET DES CATÉGORIES (AVEC MARGES) 🎨
-# Basé sur les conventions de confort/qualité de l'air
+# 🎨 DÉFINITION DES CARTES DE COULEURS ET DES CATÉGORIES
 # ==============================================================================
 COLOR_MAPS = {
     'temperature': {
@@ -83,8 +91,8 @@ COLOR_MAPS = {
     }
 }
 # ==============================================================================
-        
-
+# 🎨 DETERMINE LA VILLE
+# ==============================================================================
 def determine_city_and_month(filename):
     """
     Extrait la ville et le mois d'un nom de fichier au format 'ville-mois.csv'.
@@ -96,6 +104,9 @@ def determine_city_and_month(filename):
         return city.capitalize(), month.capitalize()
     return "Inconnue", "Inconnu"
 
+# ==============================================================================
+# 🎨 CONVERTIT LE TEMPS EN DATE ET HEURE
+# ==============================================================================
 def convert_to_datetime(df):
     """
     Tente de convertir les colonnes de date/heure dont le nom contient 'temps'.
@@ -104,7 +115,7 @@ def convert_to_datetime(df):
     """
     time_col_name = None
     
-    # Prioriser la colonne nommée exactement 'temps'
+    
     if 'temps' in df.columns:
         col = 'temps'
         try:
@@ -116,7 +127,7 @@ def convert_to_datetime(df):
         except Exception as e:
             app.logger.warning(f"Impossible de convertir la colonne '{col}' en datetime: {e}")
 
-    # Logique de repli: chercher n'importe quelle colonne contenant 'temps'
+    
     for col in df.columns:
         if 'temps' in col.lower():
             try:
@@ -128,9 +139,11 @@ def convert_to_datetime(df):
             except Exception as e:
                 app.logger.warning(f"Impossible de convertir la colonne '{col}' en datetime: {e}")
     return df, time_col_name
-
+# ==============================================================================
+# 🎨 Charge le DataFrame depuis le fichier temporaire
+# ==============================================================================
 def get_df_from_session():
-    """Charge le DataFrame depuis le fichier temporaire, si un fichier est en session."""
+    
     if 'data_file' not in session:
         return None
     data_file = session['data_file']
@@ -138,23 +151,23 @@ def get_df_from_session():
     if os.path.exists(file_path):
         return pd.read_parquet(file_path)
     return None
-
+# ==============================================================================
+# 🎨 Sauvegarde le DataFrame dans le fichier temporaire de la session
+# ==============================================================================
 def update_df_in_session(df):
-    """Sauvegarde le DataFrame dans le fichier temporaire de la session."""
+    
     data_filename = session.get('data_file')
     if data_filename:
         file_path = os.path.join(app.config['DATA_FOLDER'], data_filename)
         df.to_parquet(file_path)
         return True
     return False
-def create_color_categories(df, col_name, category_type):
-    """
-    Crée une nouvelle colonne catégorielle pour la coloration des graphiques
-    avec des labels incluant les plages de valeurs pour la légende.
 
-    Retourne le DataFrame, le nom de la nouvelle colonne, la carte de couleurs
-    et l'ordre des catégories.
-    """
+# ==============================================================================
+# 🎨 Crée une nouvelle colonne catégorielle pour la coloration des graphiques
+# ==============================================================================
+def create_color_categories(df, col_name, category_type):
+    
     new_col_name = f'{col_name}_category'
     df[new_col_name] = 'Inconnu'
     
@@ -208,6 +221,9 @@ def create_color_categories(df, col_name, category_type):
 
     return df, new_col_name, color_map, ordered_categories
 
+# ==============================================================================
+# 🎨 CALCULE LE POINT DE ROSE
+# ==============================================================================
 def calculate_dew_point(temperature, humidity):
     """
     Calcule le point de rosée en utilisant l'approximation Magnus-Tetens.
@@ -235,10 +251,15 @@ def calculate_dew_point(temperature, humidity):
     
     return dew_point
 
+# ==============================================================================
+# 🎨 PAGE INDEX
+# ==============================================================================
 @app.route('/')
 def index():
     return render_template('index.html')
-
+# ==============================================================================
+# 🎨 PAGE CHARGEMENT
+# ==============================================================================
 @app.route('/upload-data')
 def upload_data():
     return render_template('upload_data.html')
@@ -287,7 +308,7 @@ def upload_files():
                 )
             except Exception as e:
                 app.logger.error(f"Erreur lors de la lecture du fichier {file.filename}: {str(e)}")
-                continue  # Continuer avec le prochain fichier
+                continue  
 
             df_temp.columns = df_temp.columns.astype(str)
             df_temp.columns = df_temp.columns.str.strip().str.replace(' ', '')
@@ -363,7 +384,9 @@ def upload_files():
         'data_info': info,
         'preview': preview_html
     })
-            
+# ==============================================================================
+# 🎨 PAGE NETOYAGE
+# ==============================================================================            
 @app.route('/data-preparation')
 def data_preparation():
     return render_template('data_preparation.html')
@@ -494,13 +517,15 @@ def get_daily_dew_point_averages():
     # Renommer la colonne de temps pour l'affichage
     df_resampled.rename(columns={time_col: 'Date'}, inplace=True)
 
-    # Correction ici : Utilisation de la classe CSS 'data-table' pour correspondre aux autres tableaux.
+    
     daily_avg_html = df_resampled.to_html(classes='data-table')    
     return jsonify({'daily_avg_html': daily_avg_html})
 
 
 
-
+# ==============================================================================
+# 🎨 PAGE VISUALISATION
+# ==============================================================================
 @app.route('/visualizations')
 def visualizations():
     return render_template('visualizations.html')
@@ -556,8 +581,7 @@ def generate_plot():
         return jsonify({'error': f"La colonne '{color_col}' est introuvable dans le jeu de données après catégorisation."}), 400
 
     # NOTE: La fonction 'is_numeric_or_datetime' ne doit pas être redéfinie ici
-    # si elle l'est déjà au niveau global ou dans un bloc non indenté.
-    # Nous la laissons donc hors de cette fonction ou nous supposons qu'elle est définie globalement.
+    
 
     try:
         # Arguments communs pour les graphiques Plotly Express
@@ -587,7 +611,7 @@ def generate_plot():
                 fig = px.pie(counts, values='Count', names='Category')
             
         elif plot_type == 'box':
-            # Utiliser y_col si fourni, sinon utiliser x_col comme valeur (le regroupement sera fait par color_col)
+            # Utiliser y_col si fourni, sinon utiliser x_col comme valeur 
             if y_col:
                 fig = px.box(temp_df, x=x_col, y=y_col, color=color_col, **common_args)
             else:
@@ -613,10 +637,10 @@ def generate_plot():
             )
             
         # -------------------------------------------------------------------
-        # AJOUT : Activation de la barre de zoom (Range Slider) pour les séries temporelles
+        # AJOUT : Activation de la barre de zoom pour les séries temporelles
         # -------------------------------------------------------------------
-        # Condition pour vérifier si l'axe X est de type date/heure et que c'est un graphique pertinent (ligne ou nuage de points)
-        if is_numeric_or_datetime(temp_df[x_col]) and not pd.api.types.is_numeric_dtype(temp_df[x_col]) and plot_type in ['line', 'scatter']:
+        # Condition pour vérifier si l'axe X est de type date/heure et que c'est un graphique pertinent 
+        if is_numeric_or_datetime(temp_df[x_col]) and not pd.api.types.is_numeric_dtype(temp_df[x_col]) and plot_type in ['line', 'bar']:
             fig.update_layout(
                 xaxis=dict(
                     rangeselector=dict(
@@ -629,12 +653,12 @@ def generate_plot():
                         ])
                     ),
                     rangeslider=dict(
-                        visible=True # Rend la barre de zoom horizontale visible
+                        visible=True
                     ),
-                    type="date" # Assure que l'axe est traité comme une date
+                    type="date" 
                 )
             )
-        # -------------------------------------------------------------------
+        
             
         return jsonify({
             'plot_json': fig.to_json()
@@ -643,7 +667,9 @@ def generate_plot():
     except Exception as e:
         app.logger.error(f"Erreur lors de la génération du graphique: {str(e)}")
         return jsonify({'error': f"Erreur lors de la génération du graphique. Veuillez vérifier les colonnes sélectionnées et le type de graphique : {str(e)}"}), 500
-
+# ==============================================================================
+# 🎨 PAGE PREDICTION
+# ==============================================================================
 @app.route('/prediction-modeling')
 def prediction_modeling():
     return render_template('prediction_modeling.html')
@@ -702,7 +728,6 @@ def train_predict():
     # Gérer les NaT dans la colonne de temps avant toute opération
     df[time_col] = df[time_col].ffill().bfill()
     
-    # Vérifier à nouveau si la colonne de temps est valide après remplissage
     if df[time_col].isna().any():
         return jsonify({'error': 'Après le remplissage des valeurs manquantes, la colonne de temps contient toujours des valeurs invalides. Veuillez vérifier vos données.'}), 400
 
@@ -719,6 +744,36 @@ def train_predict():
             return jsonify({'error': f"La colonne '{col}' est introuvable dans le jeu de données."}), 400
     
     df = df.copy()
+
+    # ==============================================================================
+    # NOUVEAU : TRAITEMENT DES VALEURS ABERRANTES (OUTLIERS)
+    # ==============================================================================
+    # On applique le traitement sur la variable cible et les variables explicatives
+    cols_to_process = [target_col] + feature_cols
+    
+    for col in cols_to_process:
+        # S'assurer que la colonne est bien numérique
+        if pd.api.types.is_numeric_dtype(df[col]):
+            # 1. Calcul des bornes avec la méthode IQR
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # 2. Calcul de la médiane qui servira au remplacement
+            median_value = df[col].median()
+            
+            # 3. Identification des index des outliers
+            outlier_indexes = df[(df[col] < lower_bound) | (df[col] > upper_bound)].index
+            
+            # 4. Remplacement des outliers par la médiane
+            if not outlier_indexes.empty:
+                df.loc[outlier_indexes, col] = median_value
+    # ==============================================================================
+    # FIN DU BLOC DE TRAITEMENT DES VALEURS ABERRANTES
+    # ==============================================================================
+
 
     # Ingénierie des fonctionnalités
     df['heure'] = df[time_col].dt.hour
@@ -841,11 +896,139 @@ def train_predict():
         'predictions_rf': predictions_rf,
         'predictions_gb': predictions_gb
     })
+    
+
+
+@app.route('/get_comparison_columns', methods=['GET'])
+def get_comparison_columns():
+    """
+    Route pour obtenir les colonnes textuelles (pour la ville) et numériques
+    (pour les données météo) afin de peupler les menus déroulants.
+    """
+    df = get_df_from_session()
+    if df is None:
+        return jsonify({'error': 'Aucune donnée chargée en session.'}), 400
+    
+    numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+    # On suppose que les colonnes de type 'object' ou 'category' peuvent contenir le nom de la ville
+    text_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    
+    return jsonify({
+        'numeric_columns': numeric_cols,
+        'text_columns': text_cols
+    })
+
+
+# ==============================================================================
+# PAGE DE COMPARAISON METEO
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. ROUTE POUR AFFICHER LA PAGE HTML (MÉTHODE GET)
+# ------------------------------------------------------------------------------
+# Le but de cette route est de simplement retourner le fichier comparison.html.
+# C'est l'URL que vous devez visiter dans votre navigateur.
+#
+@app.route('/comparaison')
+def comparaison_page():
+    """Affiche la page de comparaison météo."""
+    return render_template('comparaison_page.html')
+
+
+# ------------------------------------------------------------------------------
+# 2. ROUTE POUR TRAITER LES DONNÉES ET GÉNÉRER LES GRAPHIQUES (MÉTHODE POST)
+# ------------------------------------------------------------------------------
+# Cette route est appelée par le JavaScript lorsque l'utilisateur clique sur le bouton.
+# Elle attend des données JSON et ne peut pas être accédée directement dans le navigateur.
+#
+@app.route('/compare_with_meteo', methods=['POST']) # <-- L'ajout de methods=['POST'] est CRUCIAL
+def compare_with_meteo():
+    """
+    Compare les données du capteur avec les données de Meteostat.
+    La ville est fournie directement par l'utilisateur.
+    """
+    df = get_df_from_session()
+    time_col = session.get('time_col')
+
+    # Validation initiale
+    if df is None or not time_col:
+        return jsonify({'error': 'Données ou colonne de temps non trouvées en session.'}), 400
+
+    # Vérifie si la requête contient bien du JSON
+    if not request.is_json:
+        return jsonify({'error': "La requête doit être au format JSON."}), 415
+
+    req_data = request.get_json()
+    temp_col = req_data.get('temp_col')
+    humidity_col = req_data.get('humidity_col')
+    city_name = req_data.get('city_name')
+
+    if not all([temp_col, humidity_col, city_name]):
+        return jsonify({'error': "Veuillez sélectionner les colonnes et saisir un nom de ville."}), 400
+
+    # Préparation des données utilisateur
+    df_prepared = df.copy()
+    df_prepared[time_col] = pd.to_datetime(df_prepared[time_col])
+    
+    start_date = df_prepared[time_col].min()
+    end_date = df_prepared[time_col].max()
+
+    # Géolocalisation de la ville
+    try:
+        geolocator = Nominatim(user_agent="pollugard-app-v3", timeout=10)
+        location = geolocator.geocode(city_name)
+        if location is None:
+            return jsonify({'error': f"La ville '{city_name}' n'a pas pu être géolocalisée."}), 400
+        meteo_point = Point(location.latitude, location.longitude)
+    except Exception as e:
+        return jsonify({'error': f"Erreur de géolocalisation : {e}"}), 500
+
+    # Récupération des données Meteostat
+    try:
+        meteo_data = Hourly(meteo_point, start_date, end_date)
+        meteo_df = meteo_data.fetch()
+        if meteo_df.empty:
+            return jsonify({'message': f"Aucune donnée météo trouvée pour {city_name} entre {start_date.date()} et {end_date.date()}."}), 200
+    except Exception as e:
+        return jsonify({'error': f"Erreur lors de la récupération des données Meteostat : {e}"}), 500
+
+    # Fusion et alignement des données
+    local_timezone = 'Europe/Paris' # À adapter si nécessaire
+    # Ligne corrigée
+    meteo_df.index = meteo_df.index.tz_localize('UTC').tz_convert(local_timezone)
+    df_prepared[time_col] = df_prepared[time_col].dt.tz_localize(local_timezone, ambiguous='infer')
+    df_indexed = df_prepared.set_index(time_col)
+    
+    # Utiliser numeric_only=True pour éviter les avertissements sur les colonnes non-numériques
+    df_resampled = df_indexed.resample('H').mean(numeric_only=True) 
+
+    comparison_df = pd.merge(df_resampled, meteo_df, left_index=True, right_index=True, how='inner')
+
+    if comparison_df.empty:
+        return jsonify({'message': 'Aucun chevauchement temporel trouvé entre vos données et les données météo.'}), 200
+
+    # Création des graphiques Plotly
+    plots = {}
+
+    # Graphique Température
+    fig_temp = go.Figure()
+    fig_temp.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df[temp_col], name='Température Capteur', mode='lines'))
+    fig_temp.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df['temp'], name='Température Meteostat', mode='lines'))
+    fig_temp.update_layout(title=f'Comparaison de Température ({city_name})', xaxis_title='Date', yaxis_title='Température (°C)')
+    plots['temperature'] = fig_temp.to_json()
+
+    # Graphique Humidité
+    fig_humidity = go.Figure()
+    fig_humidity.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df[humidity_col], name='Humidité Capteur', mode='lines'))
+    fig_humidity.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df['rhum'], name='Humidité Meteostat', mode='lines'))
+    fig_humidity.update_layout(title=f'Comparaison de l\'Humidité ({city_name})', xaxis_title='Date', yaxis_title='Humidité Relative (%)')
+    plots['humidity'] = fig_humidity.to_json()
+
+    return jsonify({
+        'status': 'success',
+        'city': city_name,
+        'plots': plots
+    })
 
 if __name__ == '__main__':
-    # 1. Lit la variable d'environnement 'PORT' fournie par Render.
-    # 2. Si elle n'existe pas (en local), utilise le port 5000 par défaut.
-    port = int(os.environ.get('PORT', 5000))
-    
-    # 3. Utilise '0.0.0.0' comme hôte pour accepter les connexions externes de Render.
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(debug=True)

@@ -13,36 +13,13 @@
 
     <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
     <div class="container mx-auto flex justify-between items-center relative h-10">
-        <!-- Logo - Côté Gauche -->
         <a href="/" class="h-10 flex items-center z-10">
              <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
         </a>
         
-        <!-- Nouveau Cercle de Texte Rotatif - Côté Droit -->
-        <div class="rotating-text-container">
-            <div class="rotating-content">
-                <!-- LE CONTENU EST DUPLIQUÉ CI-DESSOUS POUR UN EFFET DE BOUCLE SANS PAUSE -->
-               
-                <span>CHARGER</span>
-                <span class="dot">•</span>
-                <span>NETTOYER</span>
-                <span class="dot">•</span>
-                <span>VISUALISER</span>
-                <span class="dot">•</span>
-                <span>PRÉDIRE</span>
-                <span class="dot">•</span>
-                
-                
-                <span>CHARGER</span>
-                <span class="dot">•</span>
-                <span>NETTOYER</span>
-                <span class="dot">•</span>
-                <span>VISUALISER</span>
-                <span class="dot">•</span>
-                <span>PRÉDIRE</span>
-                <span class="dot">•</span>
-            </div>
-        </div>
+        <a href="/" class="h-10 flex items-center justify-end z-10">
+             <img src="static/images/pollugard.png" alt="Logo Pollugard" class="h-12">
+        </a>
         
     </div>
 </nav>
@@ -70,7 +47,7 @@
                         <select id="targetCol" name="targetCol" class="w-full p-2 border border-gray-300 rounded-md text-gray-900"></select>
                     </div>
                     <div class="flex-1">
-                        <label for="explanatoryCols" class="block text-left text-gray-700 font-bold mb-2">Variables Explicatives</label>
+                        <label for="explanatoryCols" class="block text-left text-gray-700 font-bold mb-2">Variables Explicatives (Multiple)</label>
                         <select id="explanatoryCols" name="explanatoryCols" multiple class="w-full p-2 border border-gray-300 rounded-md h-32 text-gray-900"></select>
                     </div>
                 </div>
@@ -92,25 +69,31 @@
 
         <div id="results-section" class="main-card p-6 md:p-10 text-center hidden">
             <h2 class="text-2xl font-bold mb-4 text-gray-800">Résultats de la Prédiction</h2>
+            
             <div id="prediction-metrics" class="bg-gray-100 p-6 rounded-2xl mb-8 text-left text-gray-800">
                 </div>
-            <div id="prediction-plot" class="plot-container mx-auto"></div>
+            
+            <h3 class="text-2xl font-bold mb-4 text-gray-800">Graphique de Prédiction</h3>
+            <div id="prediction-plot" class="plot-container"></div> 
             
             <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
                 <button id="downloadPredictionBtn" class="btn-gradient">🖼️ Télécharger le graphique</button>
-                <button onclick="window.location.href='/'" class="btn-gradient">Retour à l'accueil</button>
+                <button onclick="window.location.href='/comparaison'" class="btn-gradient">Aller à la page de comparaison</button>
             </div>
         </div>
 
     </main>
 
-    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+     <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
         <div class="container mx-auto">
+            <p class="text-sm mt-4">&copy; Cliques sur une icône pour acceder à la page correspondante✨</p>
             <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
-                <a href="/upload" class="transform hover:scale-110 transition duration-300">📥</a>
-                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧹</a>
-                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📊</a>
-                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮</a>
+                <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
+                <a href="/upload-data" class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
+                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧼 Nettoyage</a>
+                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📈 Visualisation</a>
+                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮 Prédiction</a>
+                <a href="/comparaison" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
             </div>
             <p class="text-sm mt-4">&copy; 2026 Eurosmart Analytics. Tous droits réservés. ✨</p>
             <p class="text-sm mt-2">
@@ -119,7 +102,7 @@
             </p>
         </div>
     </footer>
-    <script>
+      <script>
         const getCorrelationBtn = document.getElementById('getCorrelationBtn');
         const correlationSection = document.getElementById('correlation-section');
         const correlationPlot = document.getElementById('correlation-plot');
@@ -141,13 +124,79 @@
 
         let allColumns = [];
         // Mots-clés des colonnes cibles autorisées (insensible à la casse)
-        const targetKeywords = ['température', 'humidité'];
+        const targetKeywords = ['température', 'humidité','pm', 'cov', 'co2', 'lumière'];
+        
+        // Mots-clés pour le filtrage des explicatives
+        const meteoKeywords = ['température', 'humidité', 'lumière'];
+        const pollutantKeywords = ['pm', 'cov', 'co2'];
+        
         // Mots-clés des colonnes à exclure de manière permanente (insensible à la casse)
         const permanentExclusionsKeywords = [
-            'le point rose', 'la diff', 'le mois', 'la ville', 
-            'time', 'date', 'heure', // Exclusions temporelles
-            'pm', 'cov', 'iqa', 'co2', 'nox' , 'lumière'// Exclusions de la qualité de l'air
+             'la diff', 'le mois', 'la ville', 
+            'temps', 'iqa', 'date','nox' ,'le point rose',  'heure','point_de_rosee', 'diff_temp_rosee','pression'
         ];
+
+        // --------------------------------------------------------------------------------
+        // NOUVELLE FONCTION D'AGRÉGATION JS (INCLUSION DE LA DATE)
+        // Regroupe les prédictions (ex: 10min) en moyennes horaires.
+        // Utilise le premier horodatage (Date et Heure) de l'heure pour l'affichage dans le tableau.
+        // --------------------------------------------------------------------------------
+        const aggregateToHourlyMean = (predictions) => {
+            if (!predictions || predictions.length === 0) return [];
+            
+            const hourlyGroups = {};
+
+            predictions.forEach((p, index) => {
+                // Parse the time string (e.g., "2025-10-02 20:10")
+                const date = new Date(p.time.replace(' ', 'T'));
+                // Use the full hour string (e.g., "20") as the key
+                const hourKey = date.getHours().toString().padStart(2, '0'); 
+
+                if (!hourlyGroups[hourKey]) {
+                    hourlyGroups[hourKey] = {
+                        sum: 0,
+                        count: 0,
+                        // Store the full time string of the first point in this hour block
+                        firstTime: p.time, 
+                        // The actual first point's value, which will be the first value predicted in the hour
+                        firstDateObj: date
+                    };
+                }
+                
+                // Si c'est le premier point de l'heure, met à jour firstTime (redondant car géré au-dessus, mais plus sûr)
+                if (date < hourlyGroups[hourKey].firstDateObj) {
+                     hourlyGroups[hourKey].firstDateObj = date;
+                     hourlyGroups[hourKey].firstTime = p.time;
+                }
+
+                hourlyGroups[hourKey].sum += p.value;
+                hourlyGroups[hourKey].count += 1;
+            });
+
+            // Convert groups into the final required list format
+            const aggregatedList = Object.values(hourlyGroups).map(group => {
+                const date = new Date(group.firstTime.replace(' ', 'T'));
+                
+                // Format: DD/MM HH:MM (e.g., "02/10 20:10")
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const timePart = date.toTimeString().substring(0, 5); 
+                
+                const displayDateTime = `${day}/${month} ${timePart}`;
+                
+                return {
+                    // C'est le premier temps de mesure de l'heure agrégée (ex: "02/10 20:10")
+                    time: displayDateTime, 
+                    // C'est la valeur moyenne pour le bloc horaire
+                    value: group.sum / group.count 
+                };
+            });
+
+            // Assurer un tri chronologique
+            aggregatedList.sort((a, b) => a.time.localeCompare(b.time));
+            
+            return aggregatedList;
+        };
 
 
         const displayMessage = (msg, type) => {
@@ -157,25 +206,22 @@
 
         const fetchAndPopulateColumns = async () => {
             try {
-                // Appel de la route Python pour obtenir les colonnes
                 const response = await fetch('/get_data_columns');
                 const result = await response.json();
                 if (response.ok) {
                     allColumns = result.columns;
                     
-                    // Filtrer les colonnes pour n'afficher que les cibles autorisées
                     const filteredTargets = allColumns.filter(col => 
                         targetKeywords.some(keyword => col.toLowerCase().includes(keyword))
                     );
 
                     populateSelect(targetColSelect, filteredTargets);
 
-                    // Définir 'Température' comme variable cible par défaut si elle existe
                     const defaultTarget = filteredTargets.find(col => col.toLowerCase().includes('température'));
                     if (defaultTarget) {
                         targetColSelect.value = defaultTarget;
                     } else if (filteredTargets.length > 0) {
-                        targetColSelect.value = filteredTargets[0]; // Sinon, prendre la première
+                        targetColSelect.value = filteredTargets[0];
                     }
 
                     updateExplanatoryVariables();
@@ -198,10 +244,13 @@
             });
         };
 
+        // LOGIQUE DE FILTRAGE DES EXPLICATIVES
         const updateExplanatoryVariables = () => {
             const targetCol = targetColSelect.value;
-            
-            // Logique de filtrage des colonnes explicatives
+            const lowerTargetCol = targetCol.toLowerCase();
+            let isMeteoTarget = meteoKeywords.some(keyword => lowerTargetCol.includes(keyword));
+            let isPollutantTarget = pollutantKeywords.some(keyword => lowerTargetCol.includes(keyword));
+
             const explanatoryColumns = allColumns.filter(col => {
                 const lowerCol = col.toLowerCase();
                 
@@ -210,16 +259,27 @@
                     return false;
                 }
                 
-                // 2. Exclure les colonnes permanentes (insensible à la casse et par inclusion de mot-clé)
+                // 2. Exclure les colonnes permanentes
                 const isPermanentlyExcluded = permanentExclusionsKeywords.some(keyword => lowerCol.includes(keyword));
+                if (isPermanentlyExcluded) {
+                    return false;
+                }
                 
-                return !isPermanentlyExcluded;
+                // 3. Logique de filtrage par type de cible
+                if (isMeteoTarget) {
+                    // Si la cible est MÉTÉO, n'afficher que les explicatives MÉTÉO (y compris lumière)
+                    return meteoKeywords.some(keyword => lowerCol.includes(keyword));
+                } else if (isPollutantTarget) {
+                    // Si la cible est POLLUANT, afficher TOUTES les explicatives restantes (Météo + Polluants)
+                    return true;
+                }
+
+                return true;
             });
             
-            // Les variables explicatives sont toutes les colonnes qui ne sont ni la cible, ni des colonnes à exclure
             populateSelect(explanatoryColsSelect, explanatoryColumns);
             
-            // Sélectionner toutes les variables explicatives par défaut
+            // Sélectionner TOUTES les variables explicatives par défaut
             Array.from(explanatoryColsSelect.options).forEach(option => {
                 option.selected = true;
             });
@@ -231,15 +291,21 @@
             getCorrelationBtn.disabled = true;
 
             displayMessage('Génération de la matrice de corrélation...', 'info');
-            correlationSection.classList.add('hidden'); // Cacher la carte avant de charger
+            correlationSection.classList.add('hidden');
             try {
-                // Appel de la route Python pour la matrice de corrélation
                 const response = await fetch('/get_correlation_matrix');
                 const result = await response.json();
                 if (response.ok) {
                     const plotData = JSON.parse(result.plot_json);
+                    // --- MODIFICATION POUR MAXIMISER L'ESPACE DANS LE CARD ---
+                    const layout = {
+                        ...plotData.layout,
+                        autosize: true, // Auto-ajustement à la taille du conteneur
+                        margin: { l: 2, r: 2, t: 3, b: 2 }, // Marges réduites
+                    };
+
                     Plotly.newPlot('correlation-plot', plotData.data, plotData.layout, { responsive: true });
-                    correlationSection.classList.remove('hidden'); // Afficher la carte après chargement
+                    correlationSection.classList.remove('hidden');
                     displayMessage('Matrice de corrélation générée avec succès !', 'success');
                 } else {
                     displayMessage(result.error, 'error');
@@ -261,68 +327,153 @@
                                          .map(option => option.value);
 
             if (!targetCol || featureCols.length === 0) {
-                displayMessage('Veuillez sélectionner au moins une variable cible et une variable explicative.', 'error');
+                displayMessage('Veuillez sélectionner au moins une variable cible et une ou plusieurs variables explicatives.', 'error');
                 return;
             }
 
             trainBtn.disabled = true;
             trainText.classList.add('hidden');
             trainSpinner.classList.remove('hidden');
-            displayMessage('Entraînement du modèle...', 'info');
-            resultsSection.classList.add('hidden'); // Cacher la carte avant de charger
+            displayMessage('Entraînement des modèles...', 'info');
+            resultsSection.classList.add('hidden');
 
             try {
-                // Appel de la route Python pour l'entraînement et la prédiction
                 const response = await fetch('/train_predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ targetCol: targetCol, featureCols: featureCols }),
+                    body: JSON.stringify({ targetCol: targetCol, featureCols: featureCols }), 
                 });
                 const result = await response.json();
 
                 if (response.ok) {
-                    // Les données de prédiction peuvent être utilisées pour des graphiques futurs
+                    
+                    // ----------------------------------------------------
+                    // AGRÉGATION JS : Prédire 3h (18 points) -> Moyennes Horaires (3 points)
+                    // ----------------------------------------------------
+                    // Note: Le backend Python doit renvoyer la prédiction brute (10min) pour cette fonction JS
+                    const predictions_rf_hourly = aggregateToHourlyMean(result.predictions_rf);
+                    const predictions_gb_hourly = aggregateToHourlyMean(result.predictions_gb);
+                    
+                    // Données pour le tableau (basées sur les moyennes horaires agrégées)
+                    const predictionsData = predictions_gb_hourly.map((p_gb, index) => {
+                        // Assurez-vous que les deux listes sont de la même taille
+                        const p_rf = predictions_rf_hourly[index] || { time: p_gb.time, value: 'N/A' };
+                        
+                        return {
+                            // 'time' est la date et l'heure du premier temps de mesure de l'heure agrégée (ex: "02/10 20:10")
+                            time: p_gb.time, 
+                            // Utilisation de toFixed(2) pour l'affichage de la moyenne horaire
+                            gb: typeof p_gb.value === 'number' ? p_gb.value.toFixed(2) : p_gb.value,
+                            rf: typeof p_rf.value === 'number' ? p_rf.value.toFixed(2) : p_rf.value,
+                        };
+                    });
+                    
+                    // Construction du tableau HTML (utilise les données agrégées)
+                    const tableHtml = `
+                        <div id="predictionTableContainer" class="data-table mt-4 hidden">
+                            <h3 class="text-xl font-bold mb-3 text-gray-800">Prédictions Moyennes par Heure (3 Prochaines Heures)</h3>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 bg-white rounded-xl shadow-lg">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Date et Heure de début</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Gradient Boosting (Moy.)</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Random Forest (Moy.)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        ${predictionsData.map(row => `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">${row.time}</td>
+                                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">${row.gb}</td>
+                                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">${row.rf}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // ----------------------------------------------------
+                    // MISE À JOUR DES METRICS
+                    // ----------------------------------------------------
+                    
+                    const rf_r2 = result.results['Random Forest']?.r2?.toFixed(4) || 'N/A';
+                    const rf_mse = result.results['Random Forest']?.mse?.toFixed(4) || 'N/A';
+                    const gb_r2 = result.results['Gradient Boosting']?.r2?.toFixed(4) || 'N/A';
+                    const gb_mse = result.results['Gradient Boosting']?.mse?.toFixed(4) || 'N/A';
+
+                    // Afficher les métriques de performance et le bouton pour le tableau
+                    predictionMetricsDiv.innerHTML = `
+                        <h3 class="text-xl font-bold mb-3 text-gray-800">Performance des Modèles</h3>
+                        <p class="mb-2"><strong>Random Forest R²:</strong> ${rf_r2}</p>
+                        <p class="mb-2"><strong>Random Forest MSE:</strong> ${rf_mse}</p>
+                        <p class="mb-2"><strong>Gradient Boosting R²:</strong> ${gb_r2}</p>
+                        <p class="mb-2"><strong>Gradient Boosting MSE:</strong> ${gb_mse}</p>
+                        
+                        <button id="toggleTableBtn" class="btn-gradient mt-4">
+                            Afficher le Tableau des Prédictions
+                        </button>
+                        ${tableHtml}
+                    `;
+                    
+                    // Gestionnaire d'événement pour le bouton "Afficher/Masquer le Tableau"
+                    document.getElementById('toggleTableBtn').addEventListener('click', function() {
+                        const tableContainer = document.getElementById('predictionTableContainer');
+                        if (tableContainer.classList.contains('hidden')) {
+                            tableContainer.classList.remove('hidden');
+                            this.textContent = 'Masquer le Tableau des Prédictions';
+                        } else {
+                            tableContainer.classList.add('hidden');
+                            this.textContent = 'Afficher le Tableau des Prédictions';
+                        }
+                    });
+
+                    // ----------------------------------------------------
+                    // MISE À JOUR DU GRAPHIQUE (utilise les données agrégées)
+                    // ----------------------------------------------------
+                    
                     const plotData = {
                       data: [
-                        {
-                          x: result.predictions_gb.map(p => p.time),
-                          y: result.predictions_gb.map(p => p.value),
-                          mode: 'lines',
-                          name: 'Prédictions (Gradient Boosting)',
+                        { // Gradient Boosting (Moyenne Horaire)
+                          x: (predictions_gb_hourly || []).map(p => p.time),
+                          y: (predictions_gb_hourly || []).map(p => p.value),
+                          mode: 'lines+markers',
+                          name: 'Gradient Boosting',
                           line: { color: 'rgb(255, 105, 180)', width: 2 }
                         },
-                         {
-                          x: result.predictions_rf.map(p => p.time),
-                          y: result.predictions_rf.map(p => p.value),
-                          mode: 'lines',
-                          name: 'Prédictions (Random Forest)',
+                         { // Random Forest (Moyenne Horaire)
+                          x: (predictions_rf_hourly || []).map(p => p.time),
+                          y: (predictions_rf_hourly || []).map(p => p.value),
+                          mode: 'lines+markers',
+                          name: 'Random Forest',
                           line: { color: 'rgb(75, 82, 255)', width: 2 }
-                        }
+                        },
                       ],
                       layout: {
-                        title: 'Prédictions des prochaines heures',
-                        xaxis: { title: 'Date et Heure' },
+                        title: `Prédictions pour ${targetCol}`,
+                        xaxis: { title: 'Date et Heure  de l\'intervalle', type: 'category' }, // TITRE MIS À JOUR
                         yaxis: { title: targetCol },
+                        margin: { l: 60, r: 60, b: 60, t: 60 },
                         legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'right', x: 1 }
                       }
                     };
 
                     Plotly.newPlot('prediction-plot', plotData.data, plotData.layout, { responsive: true });
                     
-                    predictionMetricsDiv.innerHTML = `
-                        <p class="mb-2"><strong>Random Forest R²:</strong> ${result.results['Random Forest'].r2.toFixed(4)}</p>
-                        <p class="mb-2"><strong>Random Forest MSE:</strong> ${result.results['Random Forest'].mse.toFixed(4)}</p>
-                         <p class="mb-2"><strong>Gradient Boosting R²:</strong> ${result.results['Gradient Boosting'].r2.toFixed(4)}</p>
-                        <p class="mb-2"><strong>Gradient Boosting MSE:</strong> ${result.results['Gradient Boosting'].mse.toFixed(4)}</p>
-                    `;
-                    
+                    // Assurer l'ajustement à la pleine largeur
+                    setTimeout(() => {
+                        Plotly.relayout('prediction-plot', {autosize: true});
+                    }, 100);
+
                     displayMessage('Modèles entraînés et prédictions générées avec succès ! 🎉', 'success');
-                    resultsSection.classList.remove('hidden'); // Afficher la carte après chargement
+                    resultsSection.classList.remove('hidden');
                     redirectBtnContainer.classList.remove('hidden');
                     downloadPredictionBtn.classList.remove('hidden');
 
                 } else {
-                    displayMessage(result.error, 'error');
+                    displayMessage(result.error || 'Erreur inconnue lors de l\'entraînement. Vérifiez la taille de votre jeu de données.', 'error');
                 }
             } catch (error) {
                 console.error('Erreur lors de l\'entraînement du modèle:', error);
@@ -339,7 +490,7 @@
         });
 
         downloadPredictionBtn.addEventListener('click', () => {
-            Plotly.downloadImage('prediction-plot', { format: 'png', filename: 'graphique_prediction' });
+            Plotly.downloadImage('prediction-plot', { format: 'png', filename: 'graphique_prediction_horaire' });
         });
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -350,6 +501,13 @@
                 trainAndPredict();
             });
             targetColSelect.addEventListener('change', updateExplanatoryVariables);
+        });
+        
+        // Gérer le redimensionnement pour que Plotly prenne toute la place
+        window.addEventListener('resize', () => {
+            if (document.getElementById('prediction-plot').hasChildNodes()) {
+                Plotly.relayout('prediction-plot', {autosize: true});
+            }
         });
     </script>
 </body>

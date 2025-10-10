@@ -1,0 +1,16 @@
+# Dossiers de cache Python
+__pycache__/
+
+# Environnement virtuel
+venv/
+.venv/
+
+# Dossiers créés par l'application pour les données et les fichiers
+# ON GARDE data/ et uploads/ car ils ne doivent pas être sur GitHub
+data/
+uploads/
+
+# Fichiers spécifiques à certains systèmes d'exploitation ou IDE
+.DS_Store
+.vscode/
+.idea/

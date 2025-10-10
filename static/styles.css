@@ -310,3 +310,73 @@ body {
         font-size: 1.2em;
         opacity: 0.8;
     }
+
+    /* Style du bouton flottant */
+        #floating-chat-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000; /* Assure qu'il est au-dessus de tout */
+            transition: transform 0.3s ease;
+        }
+        
+        /* Style de la modale de chat */
+        #chat-modal {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: min(90vw, 400px); /* Taille responsive */
+            height: min(80vh, 600px);
+            z-index: 999;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            display: none; /* Caché par défaut */
+            flex-direction: column;
+        }
+        
+        /* Style pour les messages */
+        .message-container {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+        .user-message {
+            background-color: #3b82f6; /* Bleu */
+            color: white;
+            margin-left: auto; /* Alignement à droite */
+            border-bottom-right-radius: 4px;
+        }
+        .ai-message {
+            background-color: #f3f4f6; /* Gris clair */
+            color: #1f2937;
+            margin-right: auto; /* Alignement à gauche */
+            border-bottom-left-radius: 4px;
+        }
+
+        .result-card {
+            background: #ffffff;
+            color: black;
+            border-radius: 1.5rem;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            margin-top: 2rem;
+            padding: 1.5rem; /* Augmente la marge intérieure */
+
+            /* --- MODIFICATIONS CLÉS --- */
+            display: flex; /* Active le mode flexbox pour le layout interne */
+            height: 75vh;  /* Définit une grande hauteur (75% de la hauteur de la fenêtre) */
+        }
+        
+        .plot-container {
+            width: 100%;
+            height: 100%; /* Le graphique prendra 100% de la hauteur de .result-card */
+            min-height: 400px; /* Hauteur minimale pour les petits écrans */
+            border: none;
+            box-shadow: none;
+        }
+
+        .alert-custom {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+        }
