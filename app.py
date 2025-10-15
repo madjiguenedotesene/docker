@@ -109,35 +109,40 @@ def determine_city_and_month(filename):
 # ==============================================================================
 def convert_to_datetime(df):
     """
-    Tente de convertir les colonnes de date/heure dont le nom contient 'temps'.
-    Priorise la colonne 'temps' s'il y en a une.
-    Retourne le nom de la colonne de temps si elle est trouvée.
+    Tente de convertir la colonne de temps en spécifiant le format exact
+    pour éviter les ambiguïtés entre les formats de date américains et européens.
     """
     time_col_name = None
     
-    
-    if 'temps' in df.columns:
-        col = 'temps'
-        try:
-            temp_df = pd.to_datetime(df[col], errors='coerce', infer_datetime_format=True)
-            if not temp_df.isna().all():
-                df[col] = temp_df
-                time_col_name = col
-                return df, time_col_name
-        except Exception as e:
-            app.logger.warning(f"Impossible de convertir la colonne '{col}' en datetime: {e}")
+    # Cherche une colonne qui s'appelle 'temps' ou qui contient 'temps'
+    potential_cols = [col for col in df.columns if 'temps' in col.lower()]
+    if not potential_cols:
+        return df, None
 
-    
-    for col in df.columns:
-        if 'temps' in col.lower():
-            try:
-                temp_df = pd.to_datetime(df[col], errors='coerce', infer_datetime_format=True)
-                if not temp_df.isna().all():
-                    df[col] = temp_df
-                    time_col_name = col
-                    break
-            except Exception as e:
-                app.logger.warning(f"Impossible de convertir la colonne '{col}' en datetime: {e}")
+    # Priorise la colonne nommée exactement 'temps'
+    time_col_name = 'temps' if 'temps' in potential_cols else potential_cols[0]
+
+    try:
+        # On force le format jour/mois/année heure:minute:seconde
+        # C'est la correction la plus importante.
+        df[time_col_name] = pd.to_datetime(
+            df[time_col_name], 
+            format='%d/%m/%Y %H:%M:%S',
+            errors='coerce'
+        )
+    except Exception as e:
+        app.logger.error(f"Échec de la conversion de la colonne '{time_col_name}' avec le format spécifié: {e}")
+        # Si le format échoue, on peut tenter une détection automatique comme plan B
+        try:
+            df[time_col_name] = pd.to_datetime(
+                df[time_col_name],
+                errors='coerce',
+                dayfirst=True
+            )
+        except Exception as e2:
+            app.logger.error(f"La détection automatique a aussi échoué: {e2}")
+            return df, None
+        
     return df, time_col_name
 # ==============================================================================
 # 🎨 Charge le DataFrame depuis le fichier temporaire
