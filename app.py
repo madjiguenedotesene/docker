@@ -304,7 +304,8 @@ def upload_files():
                     on_bad_lines='skip',
                     sep=delimiter,
                     decimal=decimal,
-                    header=0 if header else None
+                    header=0 if header else None,
+                    dayfirst=True 
                 )
             except Exception as e:
                 app.logger.error(f"Erreur lors de la lecture du fichier {file.filename}: {str(e)}")
