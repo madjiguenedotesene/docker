@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📥Charger Données - Eurosmart Analytics</title>
+    <title>Visualisation - Eurosmart Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inclure le script de style si vous en avez un (gardé du code original) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -14,7 +13,6 @@
 
     <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
     <div class="container mx-auto flex justify-between items-center relative h-10">
-        <!-- Logo - Côté Gauche -->
         <a href="/" class="h-10 flex items-center z-10">
              <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
         </a>
@@ -29,21 +27,20 @@
 
     <main class="container mx-auto p-8 flex-grow mb-20"> 
         <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Visualisation des Données</h1>
-        <p class="text-white mb-8 text-center">Créez des graphiques interactifs pour explorer votre jeu de données.</p>
+        <p class="text-white mb-8 text-center"></p>
         
-        <!-- CARTE 1: SÉLECTION DES PARAMÈTRES -->
         <div id="selection-card" class="main-card p-6 md:p-10 text-center">
-            <h2 class="text-2xl font-bold mb-6 text-gray-700">Paramètres du Graphique</h2>
+            <h2 class="text-2xl font-bold mb-6 text-gray-700"></h2>
 
             <form id="plot-form" class="space-y-4">
                 
                 <div class="flex flex-col md:flex-row md:space-x-4 md:space-y-0 space-y-4">
                     
                     <div class="flex-1">
-                        <label for="plotType" class="block text-left text-gray-700 font-bold mb-2">Type de graphique</label>
+                        <label for="plotType" class="block text-left text-gray-700 font-bold mb-2">Type de Graphique</label>
                         <select id="plotType" name="plotType" class="w-full p-2 border border-gray-300 rounded-md">
-                            <option value="line">Lignes (Série Temporelle)</option>
-                            <option value="bar">Barres (Série Temporelle)</option>
+                            <option value="line">Lignes</option>
+                            <option value="bar">Barres</option>
                             <option value="scatter">Nuage de points</option>
                             <option value="box">Boîte à moustaches</option>
                             <option value="distribution_histogram">Histogramme de distribution</option>
@@ -51,19 +48,8 @@
                         </select>
                     </div>
                     
-                    <div id="time-granularity-container" class="flex-1">
-                        <label for="timeGranularity" class="block text-left text-gray-700 font-bold mb-2">Granularité Temporelle</label>
-                        <select id="timeGranularity" name="timeGranularity" class="w-full p-2 border border-gray-300 rounded-md">
-                            <option value="raw">Données Brutes (Tout)</option>
-                            <option value="H">Par Heure (Moyenne)</option>
-                            <option value="D">Par Jour (Moyenne)</option>
-                            <option value="W">Par Semaine (Moyenne)</option>
-                            <option value="M">Par Mois (Moyenne)</option>
-                        </select>
-                    </div>
-
                     <div id="x-col-container" class="flex-1">
-                        <label for="xCol" class="block text-left text-gray-700 font-bold mb-2">Axe X</label>
+                        <label for="xCol" class="block text-left text-gray-700 font-bold mb-2">Variable en X</label>
                         <select id="xCol" name="xCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
                     </div>
                 </div>
@@ -71,44 +57,44 @@
                 <div class="flex flex-col md:flex-row md:space-x-4 md:space-y-0 space-y-4">
                     
                     <div id="y-col-container" class="flex-1">
-                        <label for="yCol" class="block text-left text-gray-700 font-bold mb-2">Axe Y</label>
+                        <label for="yCol" class="block text-left text-gray-700 font-bold mb-2">Variable en Y</label>
                         <select id="yCol" name="yCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
                     </div>
                     <div id="color-col-container" class="flex-1">
-                        <label for="colorCol" class="block text-left text-gray-700 font-bold mb-2">Couleur (selon X ou Y)</label>
+                        <label for="colorCol" class="block text-left text-gray-700 font-bold mb-2">Variable à colorer</label>
                         <select id="colorCol" name="colorCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
                     </div>
 
                     <div id="color-type-container" class="flex-1">
-                        <label for="colorType" class="block text-left text-gray-700 font-bold mb-2">Type de couleur</label>
+                        <label for="colorType" class="block text-left text-gray-700 font-bold mb-2">Variable à catégoriser</label>
                         <select id="colorType" name="colorType" class="w-full p-2 border border-gray-300 rounded-md">
                             </select>
                     </div>
                     
                     <div id="city-filter-container" class="flex-1">
-                        <label for="city-filter" class="block text-left text-gray-700 font-bold mb-2">Filtrer par Ville</label>
-                        <select id="city-filter" name="city-filter" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                        <label for="city-filter" class="block text-left text-gray-700 font-bold mb-2">Choix de la Ville</label>
+                        <select id="city-filter" name="city-filter" class="w-full p-2 border border-gray-300 rounded-md">
+                            <option value="">Tous les villes</option>
+                        </select>
                     </div>
                 </div>
 
-                <button type="submit" class="btn-gradient w-full md:w-auto mt-6">Générer le graphique ✨</button>
+                <button type="submit" class="btn-gradient w-full md:w-auto mt-6">Générer le graphique</button>
             </form>
         </div>
         
-        <!-- CARTE 2: AFFICHAGE DU GRAPHIQUE -->
         <div id="plot-card" class="main-card p-6 md:p-10 text-center mt-8 hidden">
-            <h2 class="text-2xl font-bold mb-6 text-gray-700">Résultat de la Visualisation</h2>
+            <h2 class="text-2xl font-bold mb-6 text-gray-700"></h2>
 
-            <div id="message-container" class="mt-4 text-center text-lg">Sélectionnez vos paramètres et cliquez sur 'Générer le graphique'.</div>
+            <div id="message-container" class="mt-4 text-center text-lg"></div>
 
             <div class="plot-container-wrapper">
                 <div id="plot-container" class="w-full h-96">
-                    <!-- Le graphique Plotly sera inséré ici -->
-                </div>
+                    </div>
             </div>
 
             <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
-                <button id="downloadPlotBtn" class="btn-gradient">🖼️ Télécharger le graphique (PNG)</button>
+                <button id="downloadPlotBtn" class="btn-gradient">Télécharger le graphique </button>
                 <button onclick="window.location.href='/prediction-modeling'" class="btn-gradient">Aller à la page Prédiction</button>
             </div>
         </div>
@@ -116,7 +102,7 @@
 
      <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
         <div class="container mx-auto">
-            <p class="text-sm mt-4">&copy; Cliques sur une icône pour acceder à la page correspondante✨</p>
+            <p class="text-sm mt-4"></p>
             <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
                 <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
                 <a href="/upload-data" class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
@@ -125,10 +111,10 @@
                 <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮 Prédiction</a>
                 <a href="/comparaion" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
             </div>
-            <p class="text-sm mt-4">&copy; 2026 Eurosmart Analytics. Tous droits réservés. ✨</p>
+            <p class="text-sm mt-4"></p>
             <p class="text-sm mt-2">
-                <span class="mr-2">📞</span>
-                <a href="tel:+33160626566" class="hover:underline">+33 1 60 62 65 66</a>
+                <span class="mr-2"></span>
+                <a href="tel:+33160626566" class="hover:underline"></a>
             </p>
         </div>
     </footer>
@@ -145,7 +131,7 @@
         const cityFilterContainer = document.getElementById('city-filter-container');
         const redirectBtnContainer = document.getElementById('redirect-btn-container');
         const downloadPlotBtn = document.getElementById('downloadPlotBtn');
-        const timeGranularitySelect = document.getElementById('timeGranularity'); 
+        // const timeGranularitySelect = document.getElementById('timeGranularity'); // Supprimé
         
         let allColumns = []; // Stocke toutes les colonnes récupérées
         let timeColumns = []; // Stocke les colonnes de temps
@@ -164,8 +150,13 @@
         };
 
         const displayMessage = (msg, type) => {
-            messageContainer.textContent = msg;
-            messageContainer.style.color = (type === 'error') ? '#ff4d4d' : 'black';
+            // N'affiche pas les messages de succès
+            if (type === 'success') {
+                messageContainer.textContent = '';
+            } else {
+                messageContainer.textContent = msg;
+                messageContainer.style.color = (type === 'error') ? '#ff4d4d' : 'black';
+            }
         };
         
         // Fonction utilitaire pour normaliser la chaîne
@@ -219,6 +210,7 @@
                 const response = await fetch('/get_unique_cities');
                 const result = await response.json();
                 if (response.ok && result.cities) {
+                    // Modifié pour utiliser "Toutes les villes" comme texte par défaut
                     populateSelect(cityFilterSelect, result.cities, true, 'Toutes les villes');
                 } else {
                     // Masquer le filtre si les villes ne sont pas disponibles
@@ -265,12 +257,12 @@
                     const timeColName = timeColumns[0];
                     populateSelect(xColSelect, [timeColName], false, timeColName);
                     xColSelect.disabled = true; // Empêcher l'utilisateur de changer l'axe X
-                    xColContainer.querySelector('label').textContent = 'Axe X (Temps)';
+                    xColContainer.querySelector('label').textContent = 'Variable en X'; // Label gardé
                 } else {
                     // Cas d'erreur si aucune colonne de temps n'est trouvée pour la série temporelle
                     populateSelect(xColSelect, ['Date/Heure non trouvée']);
                     xColSelect.disabled = true;
-                    xColContainer.querySelector('label').textContent = 'Axe X (Temps)';
+                    xColContainer.querySelector('label').textContent = 'Variable en X'; // Label gardé
                 }
                 
             } else {
@@ -287,7 +279,7 @@
                 }
                 
                 // Mettre à jour le label
-                xColContainer.querySelector('label').textContent = 'Axe X';
+                xColContainer.querySelector('label').textContent = 'Variable en X'; // Label gardé
             }
             
             // Mettre à jour les options de couleur
@@ -301,7 +293,7 @@
             const yCol = yColSelect.value;
             
             const options = [];
-            options.push({ value: "", text: "Aucun" });
+            options.push({ value: "", text: "Aucun" }); // Label gardé
 
             const isTimeSeriesPlot = ['line'].includes(plotType); 
             
@@ -354,9 +346,8 @@
             // Mettre à jour l'Axe X en fonction du type de graphique
             updateXColOptions();
             
-            // Granularité temporelle est visible uniquement pour les séries temporelles (Line, Bar)
-            const isTimeSeries = ['line', 'bar'].includes(plotType);
-            document.getElementById('time-granularity-container').style.display = isTimeSeries ? 'block' : 'none';
+            // Granularité temporelle est masquée
+            // document.getElementById('time-granularity-container').style.display = 'none'; // Supprimé
             
             // Axe Y est caché pour les graphiques de secteurs, boîtes et histogrammes
             document.getElementById('y-col-container').style.display = ['pie', 'box', 'distribution_histogram'].includes(plotType) ? 'none' : 'block';
@@ -380,7 +371,7 @@
             
             const emptyOption = document.createElement('option');
             emptyOption.value = "none";
-            emptyOption.textContent = "Aucun";
+            emptyOption.textContent = "Aucun"; // Label gardé
             colorTypeSelect.appendChild(emptyOption);
 
             if (selectedCol) {
@@ -427,7 +418,7 @@
             const colorType = plotsWithoutColorGrouping.includes(plotType) ? "none" : colorTypeSelect.value;
 
             const city = cityFilterSelect.value;
-            const timeGranularity = timeGranularitySelect.value; 
+            const timeGranularity = "raw"; // Valeur par défaut car le sélecteur est supprimé
             
             // axe X
             if (!xCol || xCol === 'Date/Heure non trouvée') {
@@ -460,7 +451,7 @@
                         colorCol, 
                         colorType, 
                         city,
-                        timeGranularity 
+                        timeGranularity // Envoi de la valeur par défaut
                     }),
                 });
 
@@ -470,7 +461,7 @@
                     const plotData = JSON.parse(result.plot_json);
                     
                     Plotly.newPlot('plot-container', plotData.data, plotData.layout, { responsive: true });
-                    displayMessage('Graphique généré avec succès ! 🎉', 'success');
+                    displayMessage('', 'success'); // Message de succès supprimé
                     redirectBtnContainer.classList.remove('hidden');
 
                 } else {

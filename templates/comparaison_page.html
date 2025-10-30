@@ -34,6 +34,19 @@
             width: 100%;
             height: 100%;
         }
+        
+        /* Spinner identique à celui de la page prédiction */
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.5); /* Bordure semi-transparente */
+            border-top-color: #ffffff; /* Bordure pleine en haut */
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="flex flex-col min-h-screen">
@@ -50,21 +63,23 @@
     </nav>
  
     <main class="container-fluid py-5 px-md-4 flex-grow">
+        
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Comparaison Météo</h1>
+        <p class="text-muted text-center mb-4"></p> 
+
         <div class="main-card p-4 p-md-5">
             <div class="text-center mb-4">
-                <h1 class="fw-bold">Comparaison Météo</h1>
-                <p class="text-muted">Comparez les données de vos capteurs avec une station de référence.</p>
-            </div>
+                </div>
             <form id="comparison-form" class="mb-4">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-4">
-                        <label for="temp-column-select" class="form-label fw-bold">Votre Colonne Température (°C)</label>
+                        <label for="temp-column-select" class="form-label fw-bold">Colonne Température (°C)</label>
                         <select id="temp-column-select" class="form-select" required disabled>
                             <option value="Température" selected>Température</option>
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label for="humidity-column-select" class="form-label fw-bold">Votre Colonne Humidité (%)</label>
+                        <label for="humidity-column-select" class="form-label fw-bold">Colonne Humidité (%)</label>
                         <select id="humidity-column-select" class="form-select" required disabled>
                             <option value="Humidité" selected>Humidité</option>
                         </select>
@@ -75,9 +90,9 @@
                     </div>
                 </div>
                 <div class="text-center mt-4">
-                    <button type="submit" class="btn-gradient">
+                    <button type="submit" class="btn-gradient flex items-center justify-center mx-auto">
                         <span id="btn-text">Lancer la Comparaison</span>
-                        <div id="loading-spinner" class="loading-spinner hidden" style="width: 20px; height: 20px; border-width: 2px; display: inline-block; vertical-align: middle;"></div>
+                        <span id="loading-spinner" class="loading-spinner ml-2 hidden"></span>
                     </button>
                 </div>
             </form>
@@ -94,15 +109,15 @@
             </div>
 
             <div id="action-btn-container" class="mt-4 flex flex-wrap gap-4 justify-center hidden">
-                <button id="downloadGraphsBtn" class="btn-gradient">🖼️ Télécharger les graphiques</button>
-                <a href="/" class="btn-gradient no-underline">🏠 Retour à l'accueil</a>
+                <button id="downloadGraphsBtn" class="btn-gradient">Télécharger les graphiques</button>
+                <a href="/" class="btn-gradient no-underline">Retour à l'accueil</a>
             </div>
         </div>
     </main>
 
     <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
         <div class="container mx-auto">
-            <p class="text-sm mt-4">&copy; Cliques sur une icône pour acceder à la page correspondante✨</p>
+            <p class="text-sm mt-4"></p>
             <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
                 <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
                 <a href="/upload-data" class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
@@ -111,10 +126,10 @@
                 <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮 Prédiction</a>
                 <a href="/comparison" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
             </div>
-            <p class="text-sm mt-4">&copy; 2026 Eurosmart Analytics. Tous droits réservés. ✨</p>
+            <p class="text-sm mt-4"></p>
             <p class="text-sm mt-2">
-                <span class="mr-2">📞</span>
-                <a href="tel:+33160626566" class="hover:underline">+33 1 60 62 65 66</a>
+                <span class="mr-2"></span>
+                <a href="tel:+33160626566" class="hover:underline"></a>
             </p>
         </div>
     </footer>
@@ -140,7 +155,7 @@
                 const cityName = document.getElementById('city-input').value;
 
                 if (!cityName) {
-                    showMessage('Veuillez saisir un nom de ville.', 'warning');
+                    showMessage('Veuillez saisir un nom de ville.', 'danger'); // Type changé en 'danger' pour erreur
                     return;
                 }
 
@@ -163,8 +178,9 @@
                     setLoading(false);
                     if (data.status === 'success') {
                         displayResults(data);
+                        // Message de succès supprimé
                     } else if (data.message) {
-                        showMessage(data.message, 'info');
+                        showMessage(data.message, 'info'); // Garde les messages d'info (ex: "Ville trouvée")
                     } else if (data.error) {
                         showMessage(data.error, 'danger');
                     }
@@ -178,7 +194,7 @@
 
             // Fonction pour afficher les résultats
             function displayResults(data) {
-                resultsTitle.textContent = `Résultats de la comparaison pour ${data.city}`;
+                resultsTitle.textContent = ``; // Titre vidé
                 
                 const tempPlotData = JSON.parse(data.plots.temperature);
                 Plotly.newPlot('temp-plot', tempPlotData.data, tempPlotData.layout, {responsive: true});
@@ -216,7 +232,13 @@
             function showMessage(message, type = 'info') {
                 // Style pour les messages d'erreur dans la carte principale
                 const alertClass = (type === 'danger') ? 'alert alert-danger' : 'alert alert-info';
-                messageContainer.innerHTML = `<div class="${alertClass} text-center" role="alert">${message}</div>`;
+                
+                // Ne pas afficher les messages de succès
+                if (type === 'success') {
+                    messageContainer.innerHTML = '';
+                } else {
+                    messageContainer.innerHTML = `<div class="${alertClass} text-center" role="alert">${message}</div>`;
+                }
             }
         });
     </script>

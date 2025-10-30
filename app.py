@@ -13,10 +13,6 @@ import uuid
 import plotly.graph_objects as go
 from datetime import timedelta
 import math
-#from google import genai
-#from google.genai.errors import APIError # Correction ici: utilise genai.errors
-# ----------------------------------------
-#from google.generativeai import types
 from datetime import datetime
 from meteostat import Point, Hourly
 from geopy.geocoders import Nominatim
@@ -643,9 +639,9 @@ def generate_plot():
             )
             
         # -------------------------------------------------------------------
-        # AJOUT : Activation de la barre de zoom pour les séries temporelles
+        #  Activation de la barre de zoom pour les séries temporelles
         # -------------------------------------------------------------------
-        # Condition pour vérifier si l'axe X est de type date/heure et que c'est un graphique pertinent 
+
         if is_numeric_or_datetime(temp_df[x_col]) and not pd.api.types.is_numeric_dtype(temp_df[x_col]) and plot_type in ['line', 'bar']:
             fig.update_layout(
                 xaxis=dict(
@@ -925,16 +921,10 @@ def get_comparison_columns():
     })
 
 
-# ==============================================================================
-# PAGE DE COMPARAISON METEO
-# ==============================================================================
-
 # ------------------------------------------------------------------------------
 # 1. ROUTE POUR AFFICHER LA PAGE HTML (MÉTHODE GET)
 # ------------------------------------------------------------------------------
-# Le but de cette route est de simplement retourner le fichier comparison.html.
-# C'est l'URL que vous devez visiter dans votre navigateur.
-#
+
 @app.route('/comparaison')
 def comparaison_page():
     """Affiche la page de comparaison météo."""
@@ -944,10 +934,8 @@ def comparaison_page():
 # ------------------------------------------------------------------------------
 # 2. ROUTE POUR TRAITER LES DONNÉES ET GÉNÉRER LES GRAPHIQUES (MÉTHODE POST)
 # ------------------------------------------------------------------------------
-# Cette route est appelée par le JavaScript lorsque l'utilisateur clique sur le bouton.
-# Elle attend des données JSON et ne peut pas être accédée directement dans le navigateur.
-#
-@app.route('/compare_with_meteo', methods=['POST']) # <-- L'ajout de methods=['POST'] est CRUCIAL
+
+@app.route('/compare_with_meteo', methods=['POST']) 
 def compare_with_meteo():
     """
     Compare les données du capteur avec les données de Meteostat.
