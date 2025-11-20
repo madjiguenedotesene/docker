@@ -31,4 +31,5 @@ jobs:
             pip install -r requirements.txt
             
             
-            sudo systemctl restart analyse
+            sudo systemctl restart gunicorn
+            
