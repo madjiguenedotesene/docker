@@ -1,4 +1,5 @@
 import pandas as pd
+import requests
 from flask import Flask, render_template, request, jsonify, session
 import os
 import plotly.express as px
@@ -16,6 +17,10 @@ import math
 from datetime import datetime
 from meteostat import Point, Hourly
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
+
+import time
+
 
 
 
@@ -258,134 +263,233 @@ def calculate_dew_point(temperature, humidity):
 @app.route('/')
 def index():
     return render_template('index.html')
+
 # ==============================================================================
-# 🎨 PAGE CHARGEMENT
+# 🛠️ ROUTE API PROXY (Pour l'autocomplétion sécurisée)
+# ==============================================================================
+@app.route('/api/experiments')
+def get_experiments_proxy():
+    url = "https://polluguard.eurosmart.fr/get_experiments"
+    token = "IUFNIFN-9z84fSION@soi-efgzerg" # Votre Token
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify([]) 
+    except Exception as e:
+        app.logger.error(f"Erreur API Eurosmart: {e}")
+        return jsonify([])
+
+
+
+# ==============================================================================
+# 🌍 FONCTION : REVERSE GEOCODING (Lat/Lon -> Ville)
+# ==============================================================================
+def get_city_from_coordinates(lat, lon):
+    """
+    Utilise OpenStreetMap (Nominatim) pour trouver la ville à partir des coordonnées.
+    """
+    try:
+        # Il est important de donner un user_agent unique
+        geolocator = Nominatim(user_agent="eurosmart_analytics_app")
+        location = geolocator.reverse(f"{lat}, {lon}", language='fr', exactly_one=True)
+        
+        if location:
+            address = location.raw.get('address', {})
+            # On cherche la ville, ou le village, ou la commune
+            city = address.get('city') or address.get('town') or address.get('village') or address.get('municipality')
+            if city:
+                return city
+    except Exception as e:
+        print(f"Erreur Geocoding: {e}")
+    
+    return None 
+
+
+# ==============================================================================
+# 📥 ROUTE D'UPLOAD
 # ==============================================================================
 @app.route('/upload-data')
 def upload_data():
     return render_template('upload_data.html')
 
-
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    uploaded_files = request.files.getlist('file') + request.files.getlist('file[]')
-        
-    if not uploaded_files or uploaded_files[0].filename == '':
-        return jsonify({'error': 'Aucun fichier sélectionné. Veuillez choisir au moins un fichier.'}), 400
+    # 1. Récupération des entrées
+    codes_input = request.form.get('code_exp')
+    manual_city_fallback = request.form.get('city_exp', '').strip()
+    
+    if not codes_input:
+        return jsonify({'error': 'Veuillez entrer au moins un code expérience.'}), 400
         
     delimiter = ';'    
     decimal = ','
-    header = request.form.get('header_row') == 'on'
     
     file_info_list = []
     all_data = pd.DataFrame()
-        
-    column_mapping = {
-        '_HR': 'Humidité',
-        '_Temp': 'Température',
-        '_LUM': 'Lumière',
-        '_VOC': 'COV',
-        '_PM1': 'PM1',
-        '_PM2': 'PM2_5',
-        '_PM4': 'PM4',
-        '_PM10': 'PM10',
-        '_IQA': 'IQA',
-        '_CO2': 'CO2',
-        '_NOX': 'NOX',
-        '_PA': 'Pression'
-    }
+    errors_log = []
     
-    for file in uploaded_files:
-        if file.filename != '':
-            city, month = determine_city_and_month(file.filename)
-            try:
-                df_temp = pd.read_csv(
-                    file,
-                    encoding='latin-1',
-                    on_bad_lines='skip',
-                    sep=delimiter,
-                    decimal=decimal,
-                    header=0 if header else None,
-                    dayfirst=True 
-                )
-            except Exception as e:
-                app.logger.error(f"Erreur lors de la lecture du fichier {file.filename}: {str(e)}")
-                continue  
+    column_mapping = {
+        '_HR': 'Humidité', '_Temp': 'Température', '_LUM': 'Lumière', '_VOC': 'COV',
+        '_PM1': 'PM1', '_PM2': 'PM2_5', '_PM4': 'PM4', '_PM10': 'PM10',
+        '_IQA': 'IQA', '_CO2': 'CO2', '_NOX': 'NOX', '_PA': 'Pression', 'Villes' : 'city' 
+    }
 
+    # --- ÉTAPE 1 : RÉCUPÉRER LA LISTE API ---
+    api_experiments = []
+    try:
+        url = "https://polluguard.eurosmart.fr/get_experiments"
+        token = "IUFNIFN-9z84fSION@soi-efgzerg"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(url, headers=headers, timeout=5) # Timeout augmenté à 5s
+        if response.status_code == 200:
+            api_experiments = response.json()
+    except Exception as e:
+        app.logger.warning(f"API Eurosmart warning: {e}")
+
+    # --- ÉTAPE 2 : TRAITEMENT DES CODES ---
+    normalized_input = codes_input.replace(';', ',').replace(' ', ',')
+    code_list = [c.strip() for c in normalized_input.split(',') if c.strip()]
+
+    for i, code in enumerate(code_list):
+        
+        if i > 0:
+            time.sleep(1.5) 
+
+        try:
+            # A. Téléchargement
+            csv_url = f'https://version.eurosmart.fr/exp/polluguard_exp_{code}.csv'
+            
+            try:
+                # low_memory=False aide pour les gros fichiers
+                df_temp = pd.read_csv(csv_url, sep=delimiter, decimal=decimal, 
+                                    storage_options={'User-Agent': 'Mozilla/5.0'},
+                                    low_memory=False)
+            except Exception:
+                errors_log.append(f"{code}: Fichier introuvable ou erreur réseau.")
+                continue
+            
+            if df_temp.empty:
+                 errors_log.append(f"{code}: Fichier vide.")
+                 continue
+
+            # B. Détection Ville
+            city_name = "Inconnu"
+            
+            # 1. Via API + Géolocalisation
+            exp_info = next((item for item in api_experiments if item.get("CodeExp") == code), None)
+            
+            if exp_info and 'Latitude' in exp_info and 'Longitude' in exp_info:
+                # Appel sécurisé à votre fonction get_city_from_coordinates
+                try:
+                    detected_city = get_city_from_coordinates(exp_info['Latitude'], exp_info['Longitude'])
+                    if detected_city:
+                        city_name = detected_city
+                except Exception as e:
+                    app.logger.error(f"Erreur Geocoding pour {code}: {e}")
+            
+            # 2. Via le nom du code
+            if city_name == "Inconnu" and '_' in code:
+                parts = code.split('_')
+                # Vérifie que la première partie ressemble à une ville (lettres, >2 chars)
+                if len(parts[0]) > 2 and not parts[0].isdigit():
+                    city_name = parts[0].capitalize()
+            
+            # 3. Via saisie manuelle (seulement si on traite un seul code ou si c'est le seul moyen)
+            if city_name == "Inconnu" and manual_city_fallback:
+                city_name = manual_city_fallback
+            
+            # 4. Fallback final
+            if city_name == "Inconnu":
+                city_name = f"Exp_{code}"
+
+            # C. Nettoyage
             df_temp.columns = df_temp.columns.astype(str)
             df_temp.columns = df_temp.columns.str.strip().str.replace(' ', '')
-    
+
             rename_dict = {}
             for original, new in column_mapping.items():
                 for col in df_temp.columns:
                     if original.lower() in col.lower() and col not in rename_dict.values():
                         rename_dict[col] = new
                         break
-                    
-            if rename_dict:
-                df_temp.rename(columns=rename_dict, inplace=True)
+            if rename_dict: df_temp.rename(columns=rename_dict, inplace=True)
             
+            # Suppression colonnes inutiles
             cols_to_drop = []
             time_col_found = False
-            
             for col in df_temp.columns:
-                lower_col = col.lower()
-                if 'batterie' in lower_col:
-                    cols_to_drop.append(col)
-                elif 'temps' in lower_col:
+                if 'batterie' in col.lower(): cols_to_drop.append(col)
+                elif 'temps' in col.lower():
                     if not time_col_found:
                         time_col_found = True
                         df_temp.rename(columns={col: 'temps'}, inplace=True)
-                    else:
-                        cols_to_drop.append(col)
-            
-            if cols_to_drop:
-                df_temp = df_temp.drop(columns=cols_to_drop, errors='ignore')
+                    else: cols_to_drop.append(col)
+            if cols_to_drop: df_temp = df_temp.drop(columns=cols_to_drop, errors='ignore')
                 
+            # Date
             df_temp, time_col = convert_to_datetime(df_temp)
-            if time_col:
-                session['time_col'] = time_col
+            if time_col: session['time_col'] = time_col
             
-            # Ajout des colonnes 'city' et 'month' au DataFrame temporaire
-            df_temp['city'] = city
-            df_temp['month'] = month
+            # Ajout Méta
+            df_temp['city'] = city_name
+           
             
-            # Gérer les valeurs manquantes pour les colonnes numériques
+            # Remplissage NaN
             for col in df_temp.columns:
                 if pd.api.types.is_numeric_dtype(df_temp[col]):
-                    median_val = df_temp[col].median()
-                    df_temp[col].fillna(median_val, inplace=True)
+                    df_temp[col].fillna(df_temp[col].median(), inplace=True)
+
+            file_info_list.append({'filename': code, 'city': city_name})
             
-            
-            file_info_list.append({
-                'filename': file.filename,
-                'city': city,
-                'month': month
-            })
-            
+            # Concaténation
             all_data = pd.concat([all_data, df_temp], ignore_index=True)
+
+        except Exception as e:
+            app.logger.error(f"CRASH sur le code {code}: {e}")
+            errors_log.append(f"{code}: Erreur interne ({str(e)}).")
             
+    # --- 4. RETOUR ---
     if all_data.empty:  
-        return jsonify({'error': 'Les fichiers téléchargés ne contiennent aucune donnée valide.'}), 400
+        msg = "Échec du chargement."
+        if errors_log: msg += " Détails : " + " | ".join(errors_log)
+        return jsonify({'error': msg}), 400
             
+    # Sauvegarde Parquet (Inchangé)
     data_filename = f'{uuid.uuid4()}.parquet'
     file_path = os.path.join(app.config['DATA_FOLDER'], data_filename)
     all_data.to_parquet(file_path)
     session['data_file'] = data_filename
-                
-    preview_html = all_data.head().to_html(classes='data-table table-striped table-bordered')
-                    
+    
+    # --- MODIFICATION ICI : APERÇU INTELLIGENT ---
+    # Au lieu de prendre juste les 5 premières lignes totales (head()),
+    # on prend les 5 premières lignes de CHAQUE ville présente dans le fichier.
+    
+    try:
+        # On groupe par 'city', on prend les 5 premiers de chaque, et on reset l'index pour l'affichage
+        preview_df = all_data.groupby('city', sort=False).head(5).reset_index(drop=True)
+        
+        # Génération du HTML sans l'index (plus propre)
+        preview_html = preview_df.to_html(classes='data-table table-striped table-bordered', index=False)
+    except Exception as e:
+        # Fallback au cas où (si la colonne city n'existe pas pour une raison obscure)
+        app.logger.error(f"Erreur lors de l'aperçu groupé: {e}")
+        preview_html = all_data.head(10).to_html(classes='data-table table-striped table-bordered')
+
     info = {        
         'rows': len(all_data),
         'columns': list(all_data.columns),
         'cols_info': all_data.dtypes.astype(str).to_dict(),
         'uploaded_files': file_info_list
     }
-    return jsonify({
-        'message': 'Fichiers téléchargés et combinés avec succès.',
-        'data_info': info,
-        'preview': preview_html
-    })
+    
+    msg = 'Données chargées avec succès.'
+    if errors_log: msg += " (Attention: " + ", ".join(errors_log) + ")"
+    
+    return jsonify({'message': msg, 'data_info': info, 'preview': preview_html})       
 # ==============================================================================
 # 🎨 PAGE NETOYAGE
 # ==============================================================================            
@@ -696,7 +800,10 @@ def get_correlation_matrix():
         colorscale='RdBu',
         zmin=-1,
         zmax=1,
-        hoverongaps=False
+        hoverongaps=False,
+        text=corr_matrix.values,       
+        texttemplate='%{text}',       
+        textfont={"size": 12}          
     ))
 
     fig.update_layout(
@@ -717,6 +824,8 @@ def get_data_columns():
     numeric_cols = [col for col in df.columns if pd.api.types.is_numeric_dtype(df[col])]
     return jsonify({'columns': numeric_cols})
 
+
+
 @app.route('/train_predict', methods=['POST'])
 def train_predict():
     df = get_df_from_session()
@@ -725,59 +834,47 @@ def train_predict():
 
     time_col = session.get('time_col')
     if not time_col or time_col not in df.columns or not pd.api.types.is_datetime64_any_dtype(df[time_col]):
-        return jsonify({'error': 'Colonne de temps introuvable ou de format incorrect. Assurez-vous que le nom de la colonne contient "temps" et que les données sont valides.'}), 400
+        return jsonify({'error': 'Colonne de temps introuvable ou de format incorrect.'}), 400
 
-    # Gérer les NaT dans la colonne de temps avant toute opération
+    # Gérer les NaT dans la colonne de temps
     df[time_col] = df[time_col].ffill().bfill()
-    
     if df[time_col].isna().any():
-        return jsonify({'error': 'Après le remplissage des valeurs manquantes, la colonne de temps contient toujours des valeurs invalides. Veuillez vérifier vos données.'}), 400
+        return jsonify({'error': 'La colonne de temps contient toujours des valeurs invalides.'}), 400
 
     req_data = request.json
     target_col = req_data.get('targetCol')
     feature_cols = req_data.get('featureCols')
 
     if not target_col or not feature_cols:
-        return jsonify({'error': 'Veuillez sélectionner la variable cible et au moins une variable explicative.'}), 400
+        return jsonify({'error': 'Veuillez sélectionner la variable cible et les variables explicatives.'}), 400
 
-    # Vérifier si les colonnes existent
+    # Vérification des colonnes
     for col in [target_col] + feature_cols:
         if col not in df.columns:
-            return jsonify({'error': f"La colonne '{col}' est introuvable dans le jeu de données."}), 400
-    
+            return jsonify({'error': f"La colonne '{col}' est introuvable."}), 400
+            
     df = df.copy()
 
     # ==============================================================================
-    # NOUVEAU : TRAITEMENT DES VALEURS ABERRANTES (OUTLIERS)
+    # TRAITEMENT DES VALEURS ABERRANTES (OUTLIERS) - IQR
     # ==============================================================================
-    # On applique le traitement sur la variable cible et les variables explicatives
     cols_to_process = [target_col] + feature_cols
-    
     for col in cols_to_process:
-        # S'assurer que la colonne est bien numérique
         if pd.api.types.is_numeric_dtype(df[col]):
-            # 1. Calcul des bornes avec la méthode IQR
             Q1 = df[col].quantile(0.25)
             Q3 = df[col].quantile(0.75)
             IQR = Q3 - Q1
             lower_bound = Q1 - 1.5 * IQR
             upper_bound = Q3 + 1.5 * IQR
-            
-            # 2. Calcul de la médiane qui servira au remplacement
             median_value = df[col].median()
             
-            # 3. Identification des index des outliers
             outlier_indexes = df[(df[col] < lower_bound) | (df[col] > upper_bound)].index
-            
-            # 4. Remplacement des outliers par la médiane
             if not outlier_indexes.empty:
                 df.loc[outlier_indexes, col] = median_value
-    # ==============================================================================
-    # FIN DU BLOC DE TRAITEMENT DES VALEURS ABERRANTES
-    # ==============================================================================
 
-
-    # Ingénierie des fonctionnalités
+    # ==============================================================================
+    # INGÉNIERIE DES FONCTIONNALITÉS (FEATURE ENGINEERING)
+    # ==============================================================================
     df['heure'] = df[time_col].dt.hour
     df['jour_semaine'] = df[time_col].dt.dayofweek
     df['mois'] = df[time_col].dt.month
@@ -785,122 +882,145 @@ def train_predict():
     df['minute'] = df[time_col].dt.minute
     
     df.sort_values(by=time_col, inplace=True)
-    
-    # Ajout des variables de "lag"
+
+    # Création des variables de "lag" (décalage)
     df[f'{target_col}_lag1'] = df[target_col].shift(1)
-    
     for col in feature_cols:
         df[f'{col}_lag1'] = df[col].shift(1)
-    
-    # Remplacer les valeurs manquantes (NaN) par la médiane pour ne pas perdre de lignes
+
+    # Remplissage des NaN générés par le lag et autres manques
     for col in df.columns:
         if pd.api.types.is_numeric_dtype(df[col]):
             df[col].fillna(df[col].median(), inplace=True)
 
     if df.empty:
-        return jsonify({'error': 'Le jeu de données est trop petit pour la modélisation après la création des variables de lag.'}), 400
+        return jsonify({'error': 'Jeu de données trop petit après traitement.'}), 400
 
-    # Définition des variables explicatives (features) et de la variable cible (target)
-    features_with_time_and_lag = [f'{target_col}_lag1'] + [f'{col}_lag1' for col in feature_cols] + ['heure', 'jour_semaine', 'mois', 'jour', 'minute']
-    features_final = [col for col in features_with_time_and_lag if col in df.columns]
+    # Liste initiale de toutes les features potentielles
+    potential_features = [f'{target_col}_lag1'] + [f'{col}_lag1' for col in feature_cols] + ['heure', 'jour_semaine', 'mois', 'jour', 'minute']
+    potential_features = [col for col in potential_features if col in df.columns]
 
+    # ==============================================================================
+    # SÉLECTION DES VARIABLES (SANS FILTRE DE CORRÉLATION)
+    # ==============================================================================
+    # On utilise directement toutes les features potentielles sans filtrage
+    features_final = potential_features
+
+    # Préparation X et y
     X = df[features_final]
     y = df[target_col]
 
-    # Division des données en ensembles d'entraînement et de test
+    # Vérification taille minimale
     if len(df) < 2:
-        return jsonify({'error': 'Le jeu de données doit contenir au moins deux lignes de données valides pour la modélisation.'}), 400
+        return jsonify({'error': 'Pas assez de données pour entraîner un modèle.'}), 400
 
+    # Split Train/Test (80/20)
     split_point = int(len(df) * 0.8)
-    if split_point == 0:
-        split_point = 1
-        
+    if split_point == 0: split_point = 1 # Sécurité pour très petits datasets
+    
     X_train, X_test = X.iloc[:split_point], X.iloc[split_point:]
     y_train, y_test = y.iloc[:split_point], y.iloc[split_point:]
 
     if X_train.empty or X_test.empty:
-        return jsonify({'error': 'Les ensembles de données d\'entraînement ou de test sont vides. Le jeu de données est trop petit.'}), 400
+        return jsonify({'error': 'Données insuffisantes pour le split Train/Test.'}), 400
 
+    # ==============================================================================
+    # MODÉLISATION (AVEC RÉGRESSION LINÉAIRE)
+    # ==============================================================================
     models = {
+        "Linear Regression": LinearRegression(), # Idéal pour petits jeux de données
         "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
         "Gradient Boosting": GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
     }
 
     results = {}
+
     for name, model in models.items():
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
-        
-        mse = mean_squared_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
-        mae = mean_absolute_error(y_test, y_pred)
+        try:
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+            
+            mse = mean_squared_error(y_test, y_pred)
+            r2 = r2_score(y_test, y_pred)
+            mae = mean_absolute_error(y_test, y_pred)
 
-        model_filename = f'modele_{name.replace(" ", "_")}.joblib'
-        joblib.dump(model, os.path.join(app.config['OUTPUT_FOLDER'], model_filename))
+            # Sauvegarde du modèle
+            model_filename = f'modele_{name.replace(" ", "_")}.joblib'
+            joblib.dump(model, os.path.join(app.config['OUTPUT_FOLDER'], model_filename))
 
-        results[name] = {
-            'mse': mse,
-            'r2': r2,
-            'mae': mae
-        }
+            results[name] = {
+                'mse': mse,
+                'r2': r2,
+                'mae': mae
+            }
+        except Exception as e:
+            results[name] = {'error': str(e)}
 
-    # Fonction pour la prédiction itérative
+    # ==============================================================================
+    # PRÉDICTION ITÉRATIVE (FUTURE)
+    # ==============================================================================
     def predict_next_hours(model_name, num_steps=18):
         model_path = os.path.join(app.config['OUTPUT_FOLDER'], f'modele_{model_name.replace(" ", "_")}.joblib')
         if not os.path.exists(model_path):
             return []
-        
+            
         model = joblib.load(model_path)
         last_row = df.tail(1).copy()
-        
         predictions = []
         current_data = last_row.iloc[0].to_dict()
 
         for _ in range(num_steps):
-            # Mettre à jour les variables de lag avec les valeurs de l'itération précédente
+            # Mise à jour des lags
             current_data[f'{target_col}_lag1'] = current_data[target_col]
             for col in feature_cols:
                 current_data[f'{col}_lag1'] = current_data[col]
             
-            # Faire avancer le temps de 10 minutes
+            # Avance temporelle (10 minutes)
             current_data[time_col] += timedelta(minutes=10)
             
-            # Mettre à jour les features temporelles
+            # Mise à jour features temporelles
             current_data['heure'] = current_data[time_col].hour
             current_data['minute'] = current_data[time_col].minute
             current_data['jour_semaine'] = current_data[time_col].dayofweek
             current_data['jour'] = current_data[time_col].day
             current_data['mois'] = current_data[time_col].month
 
-            # Créer le DataFrame pour la prédiction
-            predict_df = pd.DataFrame([current_data])[features_final]
-            
-            # Faire la prédiction
-            prediction_value = model.predict(predict_df)[0]
-            
-            # Stocker la prédiction
-            predictions.append({
-                'time': current_data[time_col].strftime('%Y-%m-%d %H:%M'),
-                'value': prediction_value
-            })
-            
-            # Mettre à jour la variable cible pour la prochaine itération
-            current_data[target_col] = prediction_value
+            # Création du DF pour prédiction (UTILISANT UNIQUEMENT LES FEATURES SÉLECTIONNÉES)
+            # Note : features_final est défini dans la portée de train_predict, 
+            # assurez-vous que cette fonction interne y a accès ou passez-le en argument.
+            try:
+                predict_row = pd.DataFrame([current_data])
+                # Filtrer pour ne garder que les colonnes utilisées lors de l'entraînement
+                predict_df = predict_row[features_final] 
+                
+                prediction_value = model.predict(predict_df)[0]
+                
+                predictions.append({
+                    'time': current_data[time_col].strftime('%Y-%m-%d %H:%M'),
+                    'value': prediction_value
+                })
+                
+                # Mise à jour de la cible pour la prochaine boucle
+                current_data[target_col] = prediction_value
+            except Exception as e:
+                print(f"Erreur prédiction itérative: {e}")
+                break
 
         return predictions
-        
+
+    # Génération des prédictions pour les 3 modèles
+    predictions_lr = predict_next_hours("Linear Regression")
     predictions_rf = predict_next_hours("Random Forest")
     predictions_gb = predict_next_hours("Gradient Boosting")
 
     return jsonify({
         'message': 'Modèles entraînés et prédictions générées avec succès.',
+        'features_selected': features_final, # Info utile pour le front-end
         'results': results,
+        'predictions_lr': predictions_lr,
         'predictions_rf': predictions_rf,
         'predictions_gb': predictions_gb
     })
-    
-
-
 @app.route('/get_comparison_columns', methods=['GET'])
 def get_comparison_columns():
     """

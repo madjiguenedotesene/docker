@@ -6,7 +6,6 @@
     <title>Charger Données</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-  
 </head>
 <body class="flex flex-col min-h-screen">
 
@@ -15,57 +14,75 @@
         <a href="/" class="h-10 flex items-center z-10">
              <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
         </a>
-        
         <a href="/" class="h-10 flex items-center justify-end z-10">
              <img src="static/images/pollugard.png" alt="Logo Pollugard" class="h-12">
         </a>
-        
     </div>
-</nav>
+    </nav>
 
     <main class="container mx-auto p-8 flex-grow">
-        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Charger Vos Données Issues De Polluguard</h1>
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Accéder aux Expériences</h1>
 
         <div class="main-card p-6 md:p-10 text-center">
             
-            <form id="upload-form" class="space-y-6">
-                <div>
-                    <label for="file-input" class="btn-gradient w-full md:w-auto flex items-center justify-center space-x-2 cursor-pointer">
-                        <span>Sélectionner des fichiers</span>
-                    </label>
-                    <input type="file" id="file-input" name="file" multiple class="w-full text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" accept=".csv">
-                </div>
+            <form id="upload-form" class="space-y-6 max-w-2xl mx-auto">
                 
-                <div id="file-list-container" class="mt-4 hidden">
-                    <ul id="file-list" class="space-y-2 text-left"></ul>
+                <div class="text-left">
+                    <label for="code-exp" class="block text-gray-700 font-bold mb-2 text-lg">
+                        Codes Expérience
+                    </label>
+                    <div class="relative">
+                        <input type="text" 
+                               id="code-exp" 
+                               name="code_exp" 
+                               list="experiments-list"
+                               placeholder="Ex: EVRY_2025, PARIS_2024..." 
+                               class="w-full p-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-800 text-lg shadow-sm transition-all"
+                               autocomplete="off">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                            <span class="text-gray-400 text-xl">🔍</span>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2">Vous pouvez saisir plusieurs codes séparés par des virgules.</p>
+                    
+                    <datalist id="experiments-list"></datalist>
+
+                    <div class="mt-4">
+                        <button type="button" id="toggle-city-btn" class="text-blue-600 text-sm hover:underline focus:outline-none flex items-center">
+                            <span>📍 La ville n'est pas détectée ? Cliquez ici pour la saisir manuellement.</span>
+                        </button>
+                    </div>
+
+                    <div id="city-input-container" class="hidden mt-3 transition-all duration-300 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <label for="city-exp" class="block text-sm text-blue-800 font-semibold mb-1">
+                            Ville par défaut (Optionnel)
+                        </label>
+                        <input type="text" 
+                               id="city-exp" 
+                               name="city_exp" 
+                               placeholder="Ex: Evry" 
+                               class="w-full p-2 border border-blue-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800">
+                        <p class="text-xs text-blue-600 mt-1">Cette ville sera utilisée si le système n'arrive pas à la deviner via le code ou le GPS.</p>
+                    </div>
                 </div>
 
-                <div class="flex items-center justify-center space-x-2">
-                    <input type="checkbox" id="header_row" name="header_row" class="form-checkbox text-purple-600 rounded" checked>
-                    <label for="header_row" class="text-gray-700 font-bold">Mes fichiers ont un en-tête</label>
-                </div>
-
-                <div class="mt-4">
-                    <button type="submit" id="upload-btn" class="btn-gradient w-full md:w-auto flex items-center justify-center space-x-2">
-                        <span id="upload-text">Charger et Prévisualiser</span>
-                        <div id="upload-spinner" class="hidden w-4 h-4 border-2 border-white border-opacity-50 rounded-full animate-spin"></div>
+                <div class="mt-8">
+                    <button type="submit" id="upload-btn" class="btn-gradient w-full py-3 text-lg font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center">
+                        <span id="upload-text">Charger les Données</span>
+                        <div id="upload-spinner" class="hidden w-5 h-5 border-2 border-white border-opacity-50 rounded-full animate-spin ml-2"></div>
                     </button>
                 </div>
             </form>
 
-            <div id="message-container" class="mt-4 text-center text-lg"></div>
+            <div id="message-container" class="mt-6 text-center text-lg font-medium"></div>
 
         </div>
 
         <div id="df-preview-card" class="main-card p-6 md:p-10 text-center mt-8 hidden">
-            
             <div id="df-info" class="text-left text-gray-700 mb-4 font-semibold"></div>
-            
             <div class="table-preview">
-                <div id="df-preview" class="text-sm">
-                    </div>
+                <div id="df-preview" class="text-sm"></div>
             </div>
-
             <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
                 <a href="/data-preparation" class="btn-gradient w-full md:w-auto">Aller à la page de Nettoyage →</a>
             </div>
@@ -84,113 +101,73 @@
             </div>
         </div>
     </footer>
+
     <script>
         const uploadForm = document.getElementById('upload-form');
-        const fileInput = document.getElementById('file-input');
-        const fileListContainer = document.getElementById('file-list-container');
-        const fileList = document.getElementById('file-list');
         const uploadBtn = document.getElementById('upload-btn');  
         const uploadText = document.getElementById('upload-text');
         const uploadSpinner = document.getElementById('upload-spinner');
-        
-        // Nouvelle carte pour la prévisualisation
         const previewCard = document.getElementById('df-preview-card'); 
-        
         const redirectBtnContainer = document.getElementById('redirect-btn-container');    
         const messageContainer = document.getElementById('message-container');
         const previewDiv = document.getElementById('df-preview');
-        const infoDiv = document.getElementById('df-info');  
+        const infoDiv = document.getElementById('df-info');
+        const codeInput = document.getElementById('code-exp');
+        const dataList = document.getElementById('experiments-list');
+        const cityContainer = document.getElementById('city-input-container');
+        const cityInput = document.getElementById('city-exp');
+        const toggleCityBtn = document.getElementById('toggle-city-btn');
 
-        // Tableau pour stocker les objets File
-        let uploadedFiles = [];
-        
         const displayMessage = (msg, type) => {
             messageContainer.textContent = msg;
-            messageContainer.style.color = (type === 'error') ? '#ff4d4d' : '#4b52ff';
+            messageContainer.className = `mt-6 text-center text-lg font-medium ${type === 'error' ? 'text-red-500' : 'text-blue-600'}`;
         };
-    
-        const renderFileList = () => {
-            fileList.innerHTML = '';
-            if (uploadedFiles.length > 0) {
-                fileListContainer.classList.remove('hidden');
-                uploadedFiles.forEach((file, index) => {
-                    const listItem = document.createElement('li');
-                    listItem.className = 'flex items-center justify-between p-2 bg-gray-100 text-gray-700 rounded-md';
-        
-                    const fileNameSpan = document.createElement('span');
-                    fileNameSpan.className = 'file-name flex-grow truncate';  
-                    fileNameSpan.textContent = file.name;
-        
-                    const actionsDiv = document.createElement('div');
-                    actionsDiv.className = 'flex items-center space-x-2 ml-4';
-        
-                    const renameBtn = document.createElement('button');
-                    renameBtn.innerHTML = '✏️';
-                    renameBtn.className = 'text-gray-500 hover:text-blue-500 transition-colors duration-200';
-                    renameBtn.onclick = (e) => {
-                        e.preventDefault();
-                        // Texte du prompt modifié
-                        const newName = prompt(`Renommer:`);
-                        if (newName !== null && newName.trim() !== '') {
-                            const newFile = new File([file], newName, { type: file.type });
-                            uploadedFiles[index] = newFile;
-                            renderFileList();
-                        }
-                    };
-                    
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.innerHTML = '🗑️';
-                    deleteBtn.className = 'text-gray-500 hover:text-red-500 transition-colors duration-200';
-                    deleteBtn.onclick = (e) => {
-                        e.preventDefault();
-                        uploadedFiles.splice(index, 1);
-                        renderFileList();
-                        if (uploadedFiles.length === 0) {
-                            previewCard.classList.add('hidden');
-                            redirectBtnContainer.classList.add('hidden');
-                            displayMessage('');
-                        }
-                    };
-                    
-                    actionsDiv.appendChild(renameBtn);
-                    actionsDiv.appendChild(deleteBtn);
-                    listItem.appendChild(fileNameSpan);
-                    listItem.appendChild(actionsDiv);
-                    fileList.appendChild(listItem);
-                });
-            } else {
-                fileListContainer.classList.add('hidden');
+
+        // 1. Charger la liste des expériences (pour l'autocomplétion si dispo)
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/experiments');
+                if (response.ok) {
+                    const experiments = await response.json();
+                    experiments.forEach(exp => {
+                        const option = document.createElement('option');
+                        option.value = exp.CodeExp;
+                        option.label = `Lat: ${exp.Latitude}, Lon: ${exp.Longitude}`; 
+                        dataList.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error("Info: Impossible de charger la liste d'autocomplétion (pas grave)", error);
             }
-        };          
-            
-        fileInput.addEventListener('change', (event) => {
-            uploadedFiles = Array.from(event.target.files);
-            renderFileList();
+        });
+
+        // 2. Gestion du bouton pour afficher le champ ville manuel
+        toggleCityBtn.addEventListener('click', () => {
+            cityContainer.classList.toggle('hidden');
         });
             
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (uploadedFiles.length === 0) {
-                // Texte du message d'erreur supprimé
-                displayMessage('', 'error');
+            
+            const codeVal = codeInput.value.trim();
+
+            if (!codeVal) {
+                displayMessage('Veuillez entrer au moins un code expérience.', 'error');
                 return;
             }
                         
             const formData = new FormData();
-            uploadedFiles.forEach(file => {
-                formData.append('file[]', file);
-            });
-            // Ajouter la valeur de la case à cocher 'header_row'
-            const headerCheckbox = document.getElementById('header_row');
-            if (headerCheckbox.checked) {
-                formData.append('header_row', 'on');
+            formData.append('code_exp', codeVal);
+            
+            // On envoie la ville manuelle si elle est saisie
+            if (!cityContainer.classList.contains('hidden') && cityInput.value.trim() !== '') {
+                formData.append('city_exp', cityInput.value.trim());
             }
             
             uploadBtn.disabled = true;
-            uploadText.classList.add('hidden');
+            uploadText.textContent = "Traitement en cours...";
             uploadSpinner.classList.remove('hidden');
-            // Texte du message d'état supprimé
-            displayMessage('', 'info');
+            displayMessage('', 'info'); 
             
             try {
                 const response = await fetch('/upload', {
@@ -200,41 +177,38 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    // Afficher les informations et la prévisualisation dans la nouvelle carte
-                    previewDiv.innerHTML = result.preview;
+                    // Remplacement du header "city" par "Villes" dans l'affichage du tableau
+                    // Utilisation d'une regex insensible à la casse (/gi)
+                    const customPreview = result.preview.replace(/<th>city<\/th>/gi, '<th>Villes</th>');
+                    previewDiv.innerHTML = customPreview;
+                    
+                    // Liste des villes détectées
+                    const cities = [...new Set(result.data_info.uploaded_files.map(f => f.city))].join(', ');
+                    
                     infoDiv.innerHTML = `
-                        <p>Lignes: ${result.data_info.rows}</p>
-                        <p>Colonnes: ${result.data_info.columns.length}</p>
+                        <p class="text-green-600 mb-2">✅ <strong>Villes identifiées :</strong> ${cities}</p>
+                        <p>📊 <strong>Total Lignes :</strong> ${result.data_info.rows}</p>
+                        <p>📋 <strong>Total Colonnes :</strong> ${result.data_info.columns.length}</p>
                     `;
                     
-                    // Rendre la carte de prévisualisation visible
                     previewCard.classList.remove('hidden'); 
                     redirectBtnContainer.classList.remove('hidden');
-                    // Texte du message de succès supprimé
                     displayMessage('', 'success');
             
                 } else {
-                    previewCard.classList.add('hidden'); // Cacher en cas d'erreur
+                    previewCard.classList.add('hidden');
                     redirectBtnContainer.classList.add('hidden');
                     displayMessage(result.error, 'error');
                 }
             } catch (error) {
-                console.error('Erreur lors du téléchargement:', error);
-                previewCard.classList.add('hidden'); // Cacher en cas d'erreur
-                redirectBtnContainer.classList.add('hidden');
-                // Texte du message d'erreur supprimé
-                displayMessage('', 'error');
+                console.error('Erreur technique:', error);
+                displayMessage('Erreur de communication avec le serveur.', 'error');
             } finally {
                 uploadBtn.disabled = false;
-                uploadText.classList.remove('hidden');
+                uploadText.textContent = "Charger les Données";
                 uploadSpinner.classList.add('hidden');
             }
         });
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            // Pas d'initialisation spécifique au chargement de la page ici.
-        });
-
     </script>
 </body>
 </html>
