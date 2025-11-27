@@ -40,7 +40,6 @@
     <main class="container mx-auto p-4 md:p-8 flex-grow flex flex-col md:flex-row gap-6 pt-24">
         
         <!-- 1. SIDEBAR : LISTE INTELLIGENTE (Masquée par défaut) -->
-        <!-- Ajout de l'ID 'sidebar-panel' et de la classe 'hidden' -->
         <aside id="sidebar-panel" class="hidden w-full md:w-1/3 lg:w-1/4 flex-col h-[80vh] transition-all duration-300">
             <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex flex-col h-full shadow-xl">
                 <div class="mb-4 flex justify-between items-center">
@@ -68,7 +67,6 @@
         </aside>
 
         <!-- 2. MAIN CONTENT : FORMULAIRE -->
-        <!-- Ajout de l'ID 'main-content' et largeur 'w-full' par défaut -->
         <div id="main-content" class="w-full transition-all duration-300">
             <h1 class="text-3xl md:text-4xl font-extrabold mb-6 text-white text-center md:text-left">Accéder aux Expériences</h1>
 
@@ -89,7 +87,6 @@
                         </div>
                         
                         <div class="relative">
-                            <!-- RETRAIT de l'attribut list="experiments-list" pour cacher la liste native -->
                             <input type="text" 
                                    id="code-exp" 
                                    name="code_exp" 
@@ -106,8 +103,6 @@
                         </div>
 
                         <p class="text-sm text-gray-500 mt-2">Vous pouvez saisir plusieurs codes séparés par des virgules.</p>
-                        
-                        <!-- La datalist a été retirée du DOM car on ne l'utilise plus -->
 
                         <div class="mt-4">
                             <button type="button" id="toggle-city-btn" class="text-blue-600 text-sm hover:underline focus:outline-none flex items-center">
@@ -178,14 +173,12 @@
         const infoDiv = document.getElementById('df-info');
         const codeInput = document.getElementById('code-exp');
         const searchIconBtn = document.getElementById('search-icon-btn'); 
-        // const dataList = document.getElementById('experiments-list'); // SUPPRIMÉ
         const cityContainer = document.getElementById('city-input-container');
         const cityInput = document.getElementById('city-exp');
         const toggleCityBtn = document.getElementById('toggle-city-btn');
         const sidebarList = document.getElementById('sidebar-list');
         const geoStatus = document.getElementById('geo-status');
         
-        // Nouveaux éléments pour le toggle
         const sidebarPanel = document.getElementById('sidebar-panel');
         const mainContent = document.getElementById('main-content');
         const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
@@ -193,28 +186,18 @@
 
         // --- GESTION DU TOGGLE LISTE ---
         toggleSidebarBtn.addEventListener('click', () => {
-            // Afficher la sidebar
             sidebarPanel.classList.remove('hidden');
             sidebarPanel.classList.add('flex');
-            
-            // Réduire la largeur du contenu principal
             mainContent.classList.remove('w-full');
             mainContent.classList.add('w-full', 'md:w-2/3', 'lg:w-3/4');
-            
-            // Cacher le bouton "Voir la liste" puisqu'elle est ouverte
             toggleSidebarBtn.classList.add('hidden');
         });
 
         closeSidebarBtn.addEventListener('click', () => {
-            // Cacher la sidebar
             sidebarPanel.classList.add('hidden');
             sidebarPanel.classList.remove('flex');
-            
-            // Rétablir la largeur du contenu principal
             mainContent.classList.remove('md:w-2/3', 'lg:w-3/4');
             mainContent.classList.add('w-full');
-            
-            // Réafficher le bouton "Voir la liste"
             toggleSidebarBtn.classList.remove('hidden');
         });
 
@@ -245,51 +228,59 @@
             }
         };
 
+        // --- GESTION DE LA FILE D'ATTENTE GÉOCODAGE (CORRECTION DU BUG) ---
         const geocodingQueue = [];
         let isProcessingQueue = false;
 
         const processQueue = async () => {
-            if (isProcessingQueue || geocodingQueue.length === 0) {
-                isProcessingQueue = false;
-                geoStatus.textContent = "✅ Analyse terminée";
-                return;
-            }
+            // Indicateur visuel
             isProcessingQueue = true;
             geoStatus.textContent = "🔄 Recherche des villes...";
 
-            const item = geocodingQueue.shift();
-            const { lat, lon, elementId, codeExp } = item; // Plus de optionElement
+            // BOUCLE WHILE : Traite tant qu'il y a des éléments
+            while (geocodingQueue.length > 0) {
+                const item = geocodingQueue.shift();
+                const { lat, lon, elementId, codeExp } = item;
 
-            await new Promise(r => setTimeout(r, 1100));
-            const city = await fetchCityName(lat, lon);
-            
-            const el = document.getElementById(elementId);
-            if (el && city) {
-                // MODIFICATION : text-gray-400 -> text-white
-                el.innerHTML = `<span class="font-bold text-yellow-300">${city}</span> <span class="text-white text-xs">(${codeExp})</span>`;
-                el.parentElement.classList.add('bg-white/20');
-                setTimeout(() => el.parentElement.classList.remove('bg-white/20'), 500);
-            } else if (el) {
-                // MODIFICATION : text-gray-400 -> text-white, text-gray-500 -> text-white
-                el.innerHTML = `<span class="text-white italic">Zone inconnue</span> <span class="text-white text-xs">(${codeExp})</span>`;
+                // Pause pour respecter les limites de l'API (1.1s)
+                await new Promise(r => setTimeout(r, 1100));
+                
+                const city = await fetchCityName(lat, lon);
+                
+                // Mise à jour de l'interface
+                const el = document.getElementById(elementId);
+                if (el && city) {
+                    el.innerHTML = `<span class="font-bold text-yellow-300">${city}</span> <span class="text-white text-xs">(${codeExp})</span>`;
+                    el.parentElement.classList.add('bg-white/20');
+                    setTimeout(() => el.parentElement.classList.remove('bg-white/20'), 500);
+                } else if (el) {
+                    el.innerHTML = `<span class="text-white italic">Zone inconnue</span> <span class="text-white text-xs">(${codeExp})</span>`;
+                }
             }
 
-            processQueue();
+            // Fin du traitement
+            isProcessingQueue = false;
+            geoStatus.textContent = "✅ Analyse terminée";
         };
 
         const addToGeocodingQueue = (lat, lon, elementId, codeExp) => {
             const cacheKey = `geo_${lat}_${lon}`;
             const cached = localStorage.getItem(cacheKey);
+            
             if (cached) {
+                // Si en cache, affichage immédiat
                 const el = document.getElementById(elementId);
-                // MODIFICATION : text-gray-400 -> text-white
                 if (el) el.innerHTML = `<span class="font-bold text-green-300">${cached}</span> <span class="text-white text-xs">(${codeExp})</span>`;
             } else {
+                // Sinon ajout à la file
                 geocodingQueue.push({ lat, lon, elementId, codeExp });
-                if (!isProcessingQueue) processQueue();
+                
+                // Si la boucle ne tourne pas, on la lance
+                if (!isProcessingQueue) {
+                    processQueue();
+                }
             }
         };
-
 
         // --- CHARGEMENT ---
 
@@ -304,7 +295,6 @@
 
                     experiments.forEach((exp, index) => {
                         const val = exp.CodeExp;
-                        // On ne devine plus, seul l'API ou le géocoding compte
                         let villeAPI = exp.Ville || exp.City || exp.Name || exp.ville || exp.city || exp.name;
                         
                         // Sidebar Item
@@ -312,12 +302,10 @@
                         sideItem.className = "p-3 rounded-lg bg-black/20 hover:bg-blue-600/30 transition-colors cursor-pointer border border-white/5 flex items-center justify-between group select-none";
                         const spanId = `geo-res-${index}`;
                         
-                        // MODIFICATION : text-gray-400 -> text-white, text-gray-300 -> text-white
                         let displayText = villeAPI 
                             ? `<span class="font-bold text-white">${villeAPI}</span> <span class="text-white text-xs">(${val})</span>`
                             : `<span class="text-white">${val}</span>`;
 
-                        // MODIFICATION : text-gray-500 -> text-gray-300 (plus clair pour la lisibilité)
                         sideItem.innerHTML = `
                             <div class="flex flex-col">
                                 <div id="${spanId}" class="text-sm">${displayText}</div>
