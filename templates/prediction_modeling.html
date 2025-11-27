@@ -74,7 +74,7 @@
                         <label for="modelSelect" class="block text-gray-700 font-bold mb-2">Modèles</label>
                         <select id="modelSelect" name="modelSelect" class="w-full p-2 border border-gray-300 rounded-md text-gray-900 focus:ring-2 focus:ring-blue-500">
                             <option value="all">Comparaison (Tous)</option>
-                            <option value="lr" selected>Régression Linéaire (Recommandé pour petits datasets)</option>
+                            <option value="lr" selected>Régression Linéaire</option>
                             <option value="rf">Random Forest</option>
                             <option value="gb">Gradient Boosting</option>
                         </select>
@@ -100,7 +100,7 @@
         <div id="results-section" class="main-card p-6 md:p-10 text-center hidden">
             <h2 class="text-2xl font-bold mb-4 text-gray-800">Résultats de la Prédiction</h2>
             
-            <!-- (Suppression du bloc features-feedback car plus utilisé) -->
+           
 
             <!-- Métriques de performance -->
             <div id="prediction-metrics" class="bg-gray-100 p-6 rounded-2xl mb-8 text-left text-gray-800 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -153,8 +153,7 @@
         const predictionMetricsDiv = document.getElementById('prediction-metrics');
         const predictionPlotDiv = document.getElementById('prediction-plot');
         const resultsSection = document.getElementById('results-section');
-        // const featuresFeedback = document.getElementById('features-feedback'); // Supprimé
-        // const featuresList = document.getElementById('features-list'); // Supprimé
+    
         const predictionTableContainer = document.getElementById('predictionTableContainer');
         
         const messageContainer = document.getElementById('message-container');
@@ -170,11 +169,11 @@
         let allColumns = [];
         // Mots clés pour l'auto-sélection
         const targetKeywords = ['température', 'humidité','pm', 'cov', 'co2','iqa', 'lumière'];
-        const meteoKeywords = ['température', 'humidité', 'lumière'];
+        const meteoKeywords = ['température', 'humidité', 'lumière','pression'];
         const pollutantKeywords = ['pm', 'cov','iqa', 'co2'];
         const permanentExclusionsKeywords = [
              'la diff', 'le mois', 'la ville', 
-            'temps', 'date','nox' ,'le point rose',  'heure','point_de_rosee', 'diff_temp_rosee','pression'
+            'temps', 'date','nox' ,'le point rose',  'heure','point_de_rosee', 'diff_temp_rosee'
         ];
 
         // --- Fonction d'agrégation horaire ---

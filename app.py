@@ -655,42 +655,65 @@ def generate_plot():
 
     temp_df = df.copy()
 
-    if plot_type != 'line' and city:
+    # ==============================================================================
+    # 1. NETTOYAGE TEMPOREL (Uniquement pour 'line' et 'bar')
+    # ==============================================================================
+    is_time_series = False 
+
+    # On applique le traitement SI c'est une LIGNE ou une BARRE
+    if plot_type in ['line', 'bar']:
+        if x_col in temp_df.columns:
+            # 1. Conversion forcée en date
+            temp_df[x_col] = pd.to_datetime(temp_df[x_col], errors='coerce')
+            temp_df = temp_df.dropna(subset=[x_col])
+            
+            # 2. Tri chronologique (Indispensable pour l'axe temporel)
+            temp_df = temp_df.sort_values(by=x_col)
+            
+            # 3. Suppression des doublons (Le fix du "200%")
+            if 'city' in temp_df.columns:
+                temp_df = temp_df.drop_duplicates(subset=[x_col, 'city'], keep='last')
+            else:
+                temp_df = temp_df.drop_duplicates(subset=[x_col], keep='last')
+            
+            is_time_series = True
+
+    # ==============================================================================
+    # 2. FILTRAGE PAR VILLE
+    # ==============================================================================
+    if city:
         if 'city' not in temp_df.columns:
-            return jsonify({'error': "La colonne 'city' est introuvable. Assurez-vous d'avoir téléchargé un fichier avec un nom au format 'ville-mois.csv'."}), 400
+            return jsonify({'error': "La colonne 'city' est introuvable."}), 400
+        
         temp_df = temp_df[temp_df['city'] == city]
+        
         if temp_df.empty:
             return jsonify({'error': f"Aucune donnée trouvée pour la ville sélectionnée ({city})."}), 400
 
-    # Variables pour stocker la carte de couleurs et l'ordre
+    # ==============================================================================
+    # 3. GESTION DES COULEURS
+    # ==============================================================================
     color_map = None
     category_orders = {}
 
     if color_col and color_type:
         try:
-            # Utilisation de la fonction mise à jour qui renvoie la map et l'ordre
             temp_df, new_color_col, color_map, ordered_categories = create_color_categories(temp_df, color_col, color_type)
             color_col = new_color_col
-            # Définir l'ordre pour Plotly
             category_orders[color_col] = ordered_categories
-        except KeyError:
-            return jsonify({'error': f"La colonne '{color_col}' est introuvable ou de type incorrect pour la catégorisation."}), 400
         except Exception as e:
-            app.logger.error(f"Erreur lors de la création des catégories de couleur: {str(e)}")
-            return jsonify({'error': f"Erreur lors de la création des catégories de couleur: {str(e)}"}), 500
+            app.logger.error(f"Erreur couleur: {str(e)}")
 
+    # Vérifications colonnes
     if x_col not in temp_df.columns:
-        return jsonify({'error': f"La colonne '{x_col}' est introuvable dans le jeu de données."}), 400
+        return jsonify({'error': f"La colonne '{x_col}' est introuvable."}), 400
     if y_col and y_col not in temp_df.columns:
-        return jsonify({'error': f"La colonne '{y_col}' est introuvable dans le jeu de données."}), 400
-    if color_col and color_col not in temp_df.columns:
-        return jsonify({'error': f"La colonne '{color_col}' est introuvable dans le jeu de données après catégorisation."}), 400
+        return jsonify({'error': f"La colonne '{y_col}' est introuvable."}), 400
 
-    # NOTE: La fonction 'is_numeric_or_datetime' ne doit pas être redéfinie ici
-    
-
+    # ==============================================================================
+    # 4. GÉNÉRATION DES GRAPHIQUES
+    # ==============================================================================
     try:
-        # Arguments communs pour les graphiques Plotly Express
         common_args = {
             'color_discrete_map': color_map,
             'category_orders': category_orders,
@@ -700,15 +723,17 @@ def generate_plot():
             fig = px.scatter(temp_df, x=x_col, y=y_col, color=color_col, **common_args)
         
         elif plot_type == 'bar':
-            fig = px.bar(temp_df, x=x_col, y=y_col, color=color_col, **common_args)
+            # Maintenant temp_df est trié et nettoyé, donc pas de doublons empilés
+            fig = px.bar(temp_df, x=x_col, y=y_col, color=color_col, barmode='group', **common_args)
             
         elif plot_type == 'line':
-            # Le graphique en ligne utilise la colonne 'city' pour la couleur par défaut
-            fig = px.line(df, x=x_col, y=y_col, color='city')
+            if city:
+                 fig = px.line(temp_df, x=x_col, y=y_col, **common_args)
+            else:
+                 fig = px.line(temp_df, x=x_col, y=y_col, color='city')
         
         elif plot_type == 'pie':
             if color_col:
-                # Utiliser le nom de la colonne catégorisée pour le nom et la couleur
                 counts = temp_df.groupby(color_col, observed=True).size().reset_index(name='count')
                 fig = px.pie(counts, values='count', names=color_col, color=color_col, **common_args)
             else:
@@ -717,17 +742,15 @@ def generate_plot():
                 fig = px.pie(counts, values='Count', names='Category')
             
         elif plot_type == 'box':
-            # Utiliser y_col si fourni, sinon utiliser x_col comme valeur 
             if y_col:
                 fig = px.box(temp_df, x=x_col, y=y_col, color=color_col, **common_args)
             else:
-                # Si y_col n'est pas sélectionné, on utilise color_col pour l'axe X (groupement) et x_col pour l'axe Y (valeurs)
                 fig = px.box(temp_df, x=color_col, y=x_col, color=color_col, **common_args)
             
-            # Vérification de la colonne numérique (valeurs)
-            numeric_check = temp_df[y_col] if y_col else temp_df[x_col]
-            if not is_numeric_or_datetime(numeric_check):
-                return jsonify({'error': "La colonne utilisée pour les valeurs (axe Y ou axe X si Y est vide) doit être numérique pour un graphique en boîte à moustaches."}), 400
+            # Vérif numérique
+            val_col = y_col if y_col else x_col
+            if not is_numeric_or_datetime(temp_df[val_col]):
+                 return jsonify({'error': "La colonne de valeur doit être numérique."}), 400
         
         elif plot_type == 'distribution_histogram':
             fig = px.histogram(temp_df, x=x_col, color=color_col, marginal='box', **common_args)
@@ -735,7 +758,7 @@ def generate_plot():
         else:
             return jsonify({'error': 'Type de graphique non pris en charge.'}), 400
             
-        # Ajustement de la mise en page de la légende si la couleur est catégorisée
+        # Mise en page légende
         if color_col:
             fig.update_layout(
                 legend_title_text=color_col.replace('_category', '').replace('_', ' '),
@@ -743,36 +766,28 @@ def generate_plot():
             )
             
         # -------------------------------------------------------------------
-        #  Activation de la barre de zoom pour les séries temporelles
+        # Activation du slider temporel (Uniquement si 'line' ou 'bar' activé plus haut)
         # -------------------------------------------------------------------
-
-        if is_numeric_or_datetime(temp_df[x_col]) and not pd.api.types.is_numeric_dtype(temp_df[x_col]) and plot_type in ['line', 'bar']:
+        if is_time_series:
             fig.update_layout(
                 xaxis=dict(
+                    type="date", # Force l'axe X en mode DATE (gère les trous temporels)
                     rangeselector=dict(
                         buttons=list([
                             dict(count=1, label="1h", step="hour", stepmode="backward"),
                             dict(count=1, label="1j", step="day", stepmode="backward"),
-                            dict(count=7, label="1s", step="day", stepmode="backward"),
-                            dict(count=1, label="1m", step="month", stepmode="backward"),
                             dict(step="all", label="Tout")
                         ])
                     ),
-                    rangeslider=dict(
-                        visible=True
-                    ),
-                    type="date" 
+                    rangeslider=dict(visible=True)
                 )
             )
         
-            
-        return jsonify({
-            'plot_json': fig.to_json()
-        })
+        return jsonify({'plot_json': fig.to_json()})
 
     except Exception as e:
-        app.logger.error(f"Erreur lors de la génération du graphique: {str(e)}")
-        return jsonify({'error': f"Erreur lors de la génération du graphique. Veuillez vérifier les colonnes sélectionnées et le type de graphique : {str(e)}"}), 500
+        app.logger.error(f"Erreur plot: {str(e)}")
+        return jsonify({'error': f"Erreur technique : {str(e)}"}), 500
 # ==============================================================================
 # 🎨 PAGE PREDICTION
 # ==============================================================================
@@ -928,7 +943,7 @@ def train_predict():
     # MODÉLISATION (AVEC RÉGRESSION LINÉAIRE)
     # ==============================================================================
     models = {
-        "Linear Regression": LinearRegression(), # Idéal pour petits jeux de données
+        "Linear Regression": LinearRegression(), 
         "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
         "Gradient Boosting": GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
     }
@@ -985,9 +1000,7 @@ def train_predict():
             current_data['jour'] = current_data[time_col].day
             current_data['mois'] = current_data[time_col].month
 
-            # Création du DF pour prédiction (UTILISANT UNIQUEMENT LES FEATURES SÉLECTIONNÉES)
-            # Note : features_final est défini dans la portée de train_predict, 
-            # assurez-vous que cette fonction interne y a accès ou passez-le en argument.
+            
             try:
                 predict_row = pd.DataFrame([current_data])
                 # Filtrer pour ne garder que les colonnes utilisées lors de l'entraînement

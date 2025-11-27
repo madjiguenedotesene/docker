@@ -6,90 +6,153 @@
     <title>Charger Données</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        /* Style personnalisé pour la barre de défilement de la liste */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+    </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="flex flex-col min-h-screen bg-gray-900">
 
     <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
-    <div class="container mx-auto flex justify-between items-center relative h-10">
-        <a href="/" class="h-10 flex items-center z-10">
-             <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
-        </a>
-        <a href="/" class="h-10 flex items-center justify-end z-10">
-             <img src="static/images/pollugard.png" alt="Logo Pollugard" class="h-12">
-        </a>
-    </div>
+        <div class="container mx-auto flex justify-between items-center relative h-10">
+            <a href="/" class="h-10 flex items-center z-10">
+                 <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
+            </a>
+            <a href="/" class="h-10 flex items-center justify-end z-10">
+                 <img src="static/images/pollugard.png" alt="Logo Pollugard" class="h-12">
+            </a>
+        </div>
     </nav>
 
-    <main class="container mx-auto p-8 flex-grow">
-        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Accéder aux Expériences</h1>
-
-        <div class="main-card p-6 md:p-10 text-center">
-            
-            <form id="upload-form" class="space-y-6 max-w-2xl mx-auto">
-                
-                <div class="text-left">
-                    <label for="code-exp" class="block text-gray-700 font-bold mb-2 text-lg">
-                        Codes Expérience
-                    </label>
-                    <div class="relative">
-                        <input type="text" 
-                               id="code-exp" 
-                               name="code_exp" 
-                               list="experiments-list"
-                               placeholder="Ex: EVRY_2025, PARIS_2024..." 
-                               class="w-full p-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-800 text-lg shadow-sm transition-all"
-                               autocomplete="off">
-                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                            <span class="text-gray-400 text-xl">🔍</span>
-                        </div>
+    <!-- MAIN CONTAINER -->
+    <main class="container mx-auto p-4 md:p-8 flex-grow flex flex-col md:flex-row gap-6 pt-24">
+        
+        <!-- 1. SIDEBAR : LISTE INTELLIGENTE (Masquée par défaut) -->
+        <!-- Ajout de l'ID 'sidebar-panel' et de la classe 'hidden' -->
+        <aside id="sidebar-panel" class="hidden w-full md:w-1/3 lg:w-1/4 flex-col h-[80vh] transition-all duration-300">
+            <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex flex-col h-full shadow-xl">
+                <div class="mb-4 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-white mb-1">📍 Sites Disponibles</h2>
+                        <p class="text-[10px] text-gray-300">Ctrl + Clic pour sélectionner plusieurs</p>
                     </div>
-                    <p class="text-sm text-gray-500 mt-2">Vous pouvez saisir plusieurs codes séparés par des virgules.</p>
-                    
-                    <datalist id="experiments-list"></datalist>
-
-                    <div class="mt-4">
-                        <button type="button" id="toggle-city-btn" class="text-blue-600 text-sm hover:underline focus:outline-none flex items-center">
-                            <span>📍 La ville n'est pas détectée ? Cliquez ici pour la saisir manuellement.</span>
-                        </button>
-                    </div>
-
-                    <div id="city-input-container" class="hidden mt-3 transition-all duration-300 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                        <label for="city-exp" class="block text-sm text-blue-800 font-semibold mb-1">
-                            Ville par défaut (Optionnel)
-                        </label>
-                        <input type="text" 
-                               id="city-exp" 
-                               name="city_exp" 
-                               placeholder="Ex: Evry" 
-                               class="w-full p-2 border border-blue-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800">
-                        <p class="text-xs text-blue-600 mt-1">Cette ville sera utilisée si le système n'arrive pas à la deviner via le code ou le GPS.</p>
-                    </div>
-                </div>
-
-                <div class="mt-8">
-                    <button type="submit" id="upload-btn" class="btn-gradient w-full py-3 text-lg font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center">
-                        <span id="upload-text">Charger les Données</span>
-                        <div id="upload-spinner" class="hidden w-5 h-5 border-2 border-white border-opacity-50 rounded-full animate-spin ml-2"></div>
+                    <!-- Bouton pour fermer la liste sur mobile ou desktop -->
+                    <button id="close-sidebar-btn" class="text-white hover:text-red-400 focus:outline-none">
+                        ✕
                     </button>
                 </div>
-            </form>
-
-            <div id="message-container" class="mt-6 text-center text-lg font-medium"></div>
-
-        </div>
-
-        <div id="df-preview-card" class="main-card p-6 md:p-10 text-center mt-8 hidden">
-            <div id="df-info" class="text-left text-gray-700 mb-4 font-semibold"></div>
-            <div class="table-preview">
-                <div id="df-preview" class="text-sm"></div>
+                <div class="mt-2 text-xs text-gray-200 mb-2" id="geo-status"></div>
+                
+                <!-- Zone de liste défilante -->
+                <div id="sidebar-list" class="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                    <div class="animate-pulse flex space-x-4">
+                        <div class="flex-1 space-y-4 py-1">
+                            <div class="h-4 bg-white/20 rounded w-3/4"></div>
+                            <div class="h-4 bg-white/20 rounded"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
-                <a href="/data-preparation" class="btn-gradient w-full md:w-auto">Aller à la page de Nettoyage →</a>
+        </aside>
+
+        <!-- 2. MAIN CONTENT : FORMULAIRE -->
+        <!-- Ajout de l'ID 'main-content' et largeur 'w-full' par défaut -->
+        <div id="main-content" class="w-full transition-all duration-300">
+            <h1 class="text-3xl md:text-4xl font-extrabold mb-6 text-white text-center md:text-left">Accéder aux Expériences</h1>
+
+            <div class="main-card p-6 md:p-10 text-center relative">
+                
+                <form id="upload-form" class="space-y-6 max-w-2xl mx-auto">
+                    
+                    <div class="text-left">
+                        <div class="flex justify-between items-end mb-2">
+                            <label for="code-exp" class="block text-gray-700 font-bold text-lg">
+                                Codes Expérience
+                            </label>
+                            
+                            <!-- NOUVEAU BOUTON TOGGLE -->
+                            <button type="button" id="toggle-sidebar-btn" class="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center gap-1">
+                                <span>📍 Voir la liste des sites</span>
+                            </button>
+                        </div>
+                        
+                        <div class="relative">
+                            <!-- RETRAIT de l'attribut list="experiments-list" pour cacher la liste native -->
+                            <input type="text" 
+                                   id="code-exp" 
+                                   name="code_exp" 
+                                   placeholder="Tapez un code ou sélectionnez dans la liste..." 
+                                   class="w-full p-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-800 text-lg shadow-sm transition-all pr-12"
+                                   autocomplete="off">
+                            
+                            <button type="button" 
+                                    id="search-icon-btn"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer hover:scale-110 transition-transform focus:outline-none"
+                                    title="Lancer la recherche">
+                                <span class="text-gray-400 text-xl hover:text-blue-600">🔍</span>
+                            </button>
+                        </div>
+
+                        <p class="text-sm text-gray-500 mt-2">Vous pouvez saisir plusieurs codes séparés par des virgules.</p>
+                        
+                        <!-- La datalist a été retirée du DOM car on ne l'utilise plus -->
+
+                        <div class="mt-4">
+                            <button type="button" id="toggle-city-btn" class="text-blue-600 text-sm hover:underline focus:outline-none flex items-center">
+                                <span>📍 La ville n'est pas détectée ? Cliquez ici pour la saisir manuellement.</span>
+                            </button>
+                        </div>
+
+                        <div id="city-input-container" class="hidden mt-3 transition-all duration-300 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                            <label for="city-exp" class="block text-sm text-blue-800 font-semibold mb-1">
+                                Ville par défaut (Optionnel)
+                            </label>
+                            <input type="text" 
+                                   id="city-exp" 
+                                   name="city_exp" 
+                                   placeholder="Ex: Evry" 
+                                   class="w-full p-2 border border-blue-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800">
+                            <p class="text-xs text-blue-600 mt-1">Cette ville sera utilisée si le système n'arrive pas à la deviner via le code ou le GPS.</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-8">
+                        <button type="submit" id="upload-btn" class="btn-gradient w-full py-3 text-lg font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center">
+                            <span id="upload-text">Charger les Données</span>
+                            <div id="upload-spinner" class="hidden w-5 h-5 border-2 border-white border-opacity-50 rounded-full animate-spin ml-2"></div>
+                        </button>
+                    </div>
+                </form>
+
+                <div id="message-container" class="mt-6 text-center text-lg font-medium"></div>
+
+            </div>
+
+            <div id="df-preview-card" class="main-card p-6 md:p-10 text-center mt-8 hidden">
+                <div id="df-info" class="text-left text-gray-700 mb-4 font-semibold"></div>
+                <div class="table-preview">
+                    <div id="df-preview" class="text-sm"></div>
+                </div>
+                <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
+                    <a href="/data-preparation" class="btn-gradient w-full md:w-auto">Aller à la page de Nettoyage →</a>
+                </div>
             </div>
         </div>
     </main>
 
-     <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
         <div class="container mx-auto">
             <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
                 <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
@@ -103,6 +166,7 @@
     </footer>
 
     <script>
+        // --- ELEMENTS DOM ---
         const uploadForm = document.getElementById('upload-form');
         const uploadBtn = document.getElementById('upload-btn');  
         const uploadText = document.getElementById('upload-text');
@@ -113,53 +177,204 @@
         const previewDiv = document.getElementById('df-preview');
         const infoDiv = document.getElementById('df-info');
         const codeInput = document.getElementById('code-exp');
-        const dataList = document.getElementById('experiments-list');
+        const searchIconBtn = document.getElementById('search-icon-btn'); 
+        // const dataList = document.getElementById('experiments-list'); // SUPPRIMÉ
         const cityContainer = document.getElementById('city-input-container');
         const cityInput = document.getElementById('city-exp');
         const toggleCityBtn = document.getElementById('toggle-city-btn');
+        const sidebarList = document.getElementById('sidebar-list');
+        const geoStatus = document.getElementById('geo-status');
+        
+        // Nouveaux éléments pour le toggle
+        const sidebarPanel = document.getElementById('sidebar-panel');
+        const mainContent = document.getElementById('main-content');
+        const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+        const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+
+        // --- GESTION DU TOGGLE LISTE ---
+        toggleSidebarBtn.addEventListener('click', () => {
+            // Afficher la sidebar
+            sidebarPanel.classList.remove('hidden');
+            sidebarPanel.classList.add('flex');
+            
+            // Réduire la largeur du contenu principal
+            mainContent.classList.remove('w-full');
+            mainContent.classList.add('w-full', 'md:w-2/3', 'lg:w-3/4');
+            
+            // Cacher le bouton "Voir la liste" puisqu'elle est ouverte
+            toggleSidebarBtn.classList.add('hidden');
+        });
+
+        closeSidebarBtn.addEventListener('click', () => {
+            // Cacher la sidebar
+            sidebarPanel.classList.add('hidden');
+            sidebarPanel.classList.remove('flex');
+            
+            // Rétablir la largeur du contenu principal
+            mainContent.classList.remove('md:w-2/3', 'lg:w-3/4');
+            mainContent.classList.add('w-full');
+            
+            // Réafficher le bouton "Voir la liste"
+            toggleSidebarBtn.classList.remove('hidden');
+        });
+
+        // --- FONCTIONS UTILITAIRES ---
 
         const displayMessage = (msg, type) => {
             messageContainer.textContent = msg;
             messageContainer.className = `mt-6 text-center text-lg font-medium ${type === 'error' ? 'text-red-500' : 'text-blue-600'}`;
         };
 
-        // 1. Charger la liste des expériences (pour l'autocomplétion si dispo)
+        const fetchCityName = async (lat, lon) => {
+            const cacheKey = `geo_${lat}_${lon}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) return cached;
+
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
+                const response = await fetch(url, { headers: { 'User-Agent': 'PolluguardApp/1.0' } });
+                if (!response.ok) return null;
+                const data = await response.json();
+                const addr = data.address || {};
+                const city = addr.city || addr.town || addr.village || addr.municipality || "Lieu inconnu";
+                localStorage.setItem(cacheKey, city);
+                return city;
+            } catch (e) {
+                console.warn("Erreur Geocoding JS:", e);
+                return null;
+            }
+        };
+
+        const geocodingQueue = [];
+        let isProcessingQueue = false;
+
+        const processQueue = async () => {
+            if (isProcessingQueue || geocodingQueue.length === 0) {
+                isProcessingQueue = false;
+                geoStatus.textContent = "✅ Analyse terminée";
+                return;
+            }
+            isProcessingQueue = true;
+            geoStatus.textContent = "🔄 Recherche des villes...";
+
+            const item = geocodingQueue.shift();
+            const { lat, lon, elementId, codeExp } = item; // Plus de optionElement
+
+            await new Promise(r => setTimeout(r, 1100));
+            const city = await fetchCityName(lat, lon);
+            
+            const el = document.getElementById(elementId);
+            if (el && city) {
+                // MODIFICATION : text-gray-400 -> text-white
+                el.innerHTML = `<span class="font-bold text-yellow-300">${city}</span> <span class="text-white text-xs">(${codeExp})</span>`;
+                el.parentElement.classList.add('bg-white/20');
+                setTimeout(() => el.parentElement.classList.remove('bg-white/20'), 500);
+            } else if (el) {
+                // MODIFICATION : text-gray-400 -> text-white, text-gray-500 -> text-white
+                el.innerHTML = `<span class="text-white italic">Zone inconnue</span> <span class="text-white text-xs">(${codeExp})</span>`;
+            }
+
+            processQueue();
+        };
+
+        const addToGeocodingQueue = (lat, lon, elementId, codeExp) => {
+            const cacheKey = `geo_${lat}_${lon}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const el = document.getElementById(elementId);
+                // MODIFICATION : text-gray-400 -> text-white
+                if (el) el.innerHTML = `<span class="font-bold text-green-300">${cached}</span> <span class="text-white text-xs">(${codeExp})</span>`;
+            } else {
+                geocodingQueue.push({ lat, lon, elementId, codeExp });
+                if (!isProcessingQueue) processQueue();
+            }
+        };
+
+
+        // --- CHARGEMENT ---
+
         document.addEventListener('DOMContentLoaded', async () => {
+            sidebarList.innerHTML = '<div class="text-center text-white/50 py-4">Chargement...</div>';
+
             try {
                 const response = await fetch('/api/experiments');
                 if (response.ok) {
                     const experiments = await response.json();
-                    experiments.forEach(exp => {
-                        const option = document.createElement('option');
-                        option.value = exp.CodeExp;
-                        option.label = `Lat: ${exp.Latitude}, Lon: ${exp.Longitude}`; 
-                        dataList.appendChild(option);
+                    sidebarList.innerHTML = ''; 
+
+                    experiments.forEach((exp, index) => {
+                        const val = exp.CodeExp;
+                        // On ne devine plus, seul l'API ou le géocoding compte
+                        let villeAPI = exp.Ville || exp.City || exp.Name || exp.ville || exp.city || exp.name;
+                        
+                        // Sidebar Item
+                        const sideItem = document.createElement('div');
+                        sideItem.className = "p-3 rounded-lg bg-black/20 hover:bg-blue-600/30 transition-colors cursor-pointer border border-white/5 flex items-center justify-between group select-none";
+                        const spanId = `geo-res-${index}`;
+                        
+                        // MODIFICATION : text-gray-400 -> text-white, text-gray-300 -> text-white
+                        let displayText = villeAPI 
+                            ? `<span class="font-bold text-white">${villeAPI}</span> <span class="text-white text-xs">(${val})</span>`
+                            : `<span class="text-white">${val}</span>`;
+
+                        // MODIFICATION : text-gray-500 -> text-gray-300 (plus clair pour la lisibilité)
+                        sideItem.innerHTML = `
+                            <div class="flex flex-col">
+                                <div id="${spanId}" class="text-sm">${displayText}</div>
+                                <div class="text-[10px] text-gray-300 mt-0.5">Lat: ${exp.Latitude?.toFixed(2)}, Lon: ${exp.Longitude?.toFixed(2)}</div>
+                            </div>
+                            <span class="text-white opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        `;
+
+                        // Clic (Simple ou Ctrl)
+                        sideItem.addEventListener('click', (e) => {
+                            if (e.ctrlKey || e.metaKey) {
+                                let currentValues = codeInput.value.split(',').map(s => s.trim()).filter(s => s !== "");
+                                if (currentValues.includes(val)) {
+                                    currentValues = currentValues.filter(c => c !== val);
+                                    sideItem.classList.add('bg-red-500/30');
+                                    setTimeout(() => sideItem.classList.remove('bg-red-500/30'), 300);
+                                } else {
+                                    currentValues.push(val);
+                                    sideItem.classList.add('bg-green-500/30');
+                                    setTimeout(() => sideItem.classList.remove('bg-green-500/30'), 300);
+                                }
+                                codeInput.value = currentValues.join(', ');
+                            } else {
+                                codeInput.value = val;
+                                codeInput.classList.add('ring-4', 'ring-blue-500');
+                                setTimeout(() => codeInput.classList.remove('ring-4', 'ring-blue-500'), 300);
+                            }
+                            codeInput.focus();
+                        });
+
+                        sidebarList.appendChild(sideItem);
+
+                        // Trigger Geocoding
+                        if (!villeAPI && exp.Latitude && exp.Longitude) {
+                            addToGeocodingQueue(exp.Latitude, exp.Longitude, spanId, val);
+                        }
                     });
                 }
             } catch (error) {
-                console.error("Info: Impossible de charger la liste d'autocomplétion (pas grave)", error);
+                console.error("Info: Impossible de charger la liste", error);
+                sidebarList.innerHTML = '<div class="text-red-400 text-center">Erreur de chargement</div>';
             }
         });
 
-        // 2. Gestion du bouton pour afficher le champ ville manuel
-        toggleCityBtn.addEventListener('click', () => {
-            cityContainer.classList.toggle('hidden');
+        // --- GESTION FORMULAIRE (Code Existant) ---
+        toggleCityBtn.addEventListener('click', () => { cityContainer.classList.toggle('hidden'); });
+        searchIconBtn.addEventListener('click', () => {
+            if (codeInput.value.trim() !== "") { uploadBtn.click(); } else { codeInput.focus(); }
         });
             
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const codeVal = codeInput.value.trim();
-
-            if (!codeVal) {
-                displayMessage('Veuillez entrer au moins un code expérience.', 'error');
-                return;
-            }
+            if (!codeVal) { displayMessage('Veuillez entrer au moins un code expérience.', 'error'); return; }
                         
             const formData = new FormData();
             formData.append('code_exp', codeVal);
-            
-            // On envoie la ville manuelle si elle est saisie
             if (!cityContainer.classList.contains('hidden') && cityInput.value.trim() !== '') {
                 formData.append('city_exp', cityInput.value.trim());
             }
@@ -170,31 +385,21 @@
             displayMessage('', 'info'); 
             
             try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData,
-                });
+                const response = await fetch('/upload', { method: 'POST', body: formData });
                 const result = await response.json();
                 
                 if (response.ok) {
-                    // Remplacement du header "city" par "Villes" dans l'affichage du tableau
-                    // Utilisation d'une regex insensible à la casse (/gi)
                     const customPreview = result.preview.replace(/<th>city<\/th>/gi, '<th>Villes</th>');
                     previewDiv.innerHTML = customPreview;
-                    
-                    // Liste des villes détectées
                     const cities = [...new Set(result.data_info.uploaded_files.map(f => f.city))].join(', ');
-                    
                     infoDiv.innerHTML = `
                         <p class="text-green-600 mb-2">✅ <strong>Villes identifiées :</strong> ${cities}</p>
                         <p>📊 <strong>Total Lignes :</strong> ${result.data_info.rows}</p>
                         <p>📋 <strong>Total Colonnes :</strong> ${result.data_info.columns.length}</p>
                     `;
-                    
                     previewCard.classList.remove('hidden'); 
                     redirectBtnContainer.classList.remove('hidden');
                     displayMessage('', 'success');
-            
                 } else {
                     previewCard.classList.add('hidden');
                     redirectBtnContainer.classList.add('hidden');
