@@ -268,22 +268,42 @@ def index():
 # 🛠️ ROUTE API PROXY (Pour l'autocomplétion sécurisée)
 # ==============================================================================
 @app.route('/api/experiments')
+#@app.route('/api/experiments', methods=['GET'])
 def get_experiments_proxy():
-    url = "https://polluguard.eurosmart.fr/get_experiments"
-    token = "IUFNIFN-9z84fSION@soi-efgzerg" # Votre Token
-    headers = {"Authorization": f"Bearer {token}"}
-    
+    """
+    Récupère la liste fraîche depuis Eurosmart en contournant tous les caches possibles.
+    """
     try:
+        # 1. Timestamp pour tromper le cache du serveur distant
+        timestamp = int(time.time())
+        url = f"https://polluguard.eurosmart.fr/get_experiments?nocache={timestamp}"
+        
+        token = "IUFNIFN-9z84fSION@soi-efgzerg"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+        }
+        
+        # 2. Appel externe
         response = requests.get(url, headers=headers, timeout=5)
+        
         if response.status_code == 200:
-            return jsonify(response.json())
+            data = response.json()
+            
+            # 3. On crée une réponse Flask avec des entêtes anti-cache stricts pour le navigateur
+            flask_response = jsonify(data)
+            flask_response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            flask_response.headers['Pragma'] = 'no-cache'
+            flask_response.headers['Expires'] = '0'
+            return flask_response
         else:
-            return jsonify([]) 
+            app.logger.error(f"Erreur API Distante: {response.status_code}")
+            return jsonify([]), response.status_code
+            
     except Exception as e:
-        app.logger.error(f"Erreur API Eurosmart: {e}")
-        return jsonify([])
-
-
+        app.logger.error(f"Erreur Route API: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # ==============================================================================
 # 🌍 FONCTION : REVERSE GEOCODING (Lat/Lon -> Ville)
@@ -1156,6 +1176,173 @@ def compare_with_meteo():
         'city': city_name,
         'plots': plots
     })
+    
+
+# ==============================================================================
+# 🧠 MOTEUR D'ANALYSE ENVIRONNEMENTALE (PHYSIQUE & CONTEXTE)
+# ==============================================================================
+
+# 1. Base de Connaissance Théorique (Encyclopédie des Polluants)
+POLLUTANT_KNOWLEDGE = {
+    'PM10': {
+        'desc': "Particules fines de diamètre inférieur à 10 micromètres, pouvant pénétrer dans les bronches.",
+        'hausse': "Trafic routier (gaz d'échappement, usure des pneus/freins), Chauffage au bois ou fioul, Chantiers BTP et poussières de voirie, Activité industrielle, Phénomènes d'inversion thermique (hiver) bloquant les polluants au sol.",
+        'baisse': "Lessivage par la pluie (les gouttes plaquent les poussières au sol), Vents forts favorisant la dispersion, Réduction de l'activité humaine (nuit, dimanche)."
+    },
+    'PM2.5': {
+        'desc': "Particules très fines (inférieures à 2.5 µm), dangereuses car elles pénètrent profondément dans les poumons.",
+        'hausse': "Combustion incomplète (moteurs diesel, chauffage résidentiel), Réactions chimiques secondaires entre gaz (ammoniac, oxydes d'azote) dans l'atmosphère.",
+        'baisse': "Précipitations durables, Brassage atmosphérique vertical (instabilité de l'air), Arrêt des combustions locales."
+    },
+    'COV': {
+        'desc': "Composés Organiques Volatils : gaz émis par certains produits ou combustions.",
+        'hausse': "Solvants et peintures (industrie/domestique), Trafic routier (imbrûlés), Végétation (isoprène émis par forte chaleur), Évaporation des réservoirs de carburant.",
+        'baisse': "Dégradation photochimique par le soleil (se transforme en ozone), Dispersion par le vent, Températures basses limitant l'évaporation."
+    },
+    'CO2': {
+        'desc': "Dioxyde de carbone, principal gaz à effet de serre et indicateur de confinement.",
+        'hausse': "Confinement (respiration humaine dans un espace clos), Combustion (chaudières, moteurs thermiques), Trafic routier dense à proximité.",
+        'baisse': "Ventilation efficace (ouverture fenêtres/VMC), Photosynthèse végétale (en journée uniquement), Absence d'occupants."
+    },
+    
+    'Température': {
+        'desc': "Mesure de la chaleur de l'air ambiant.",
+        'hausse': "Ensoleillement direct, Îlot de chaleur urbain (béton/bitume), Arrivée d'une masse d'air chaud.",
+        'baisse': "Rayonnement nocturne (ciel clair), Couverture nuageuse, Pluie (évaporation refroidissante), Masse d'air polaire."
+    },
+    'Humidité': {
+        'desc': "Quantité de vapeur d'eau présente dans l'air.",
+        'hausse': "Précipitations récentes, Transpiration végétale, Arrivée d'air maritime, Refroidissement nocturne (formation de rosée).",
+        'baisse': "Ensoleillement (assèchement), Vent de terre sec, Chauffage intérieur (hiver)."
+    }
+}
+
+ALIAS_MAP = {
+    'PM1': 'PM2.5', 'PM2_5': 'PM2.5', 'PM2.5': 'PM2.5','PM4':'PM10',
+    'VOC': 'COV', 'Temp': 'Température', 'HR': 'Humidité'
+}
+
+def get_df_from_session():
+    filename = session.get('data_file')
+    if not filename: return None
+    file_path = os.path.join(app.config['DATA_FOLDER'], filename)
+    try: return pd.read_parquet(file_path)
+    except: return None
+
+def get_season(date):
+    if pd.isna(date): return ''
+    m = date.month
+    if m in [12, 1, 2]: return 'Hiver'
+    elif m in [3, 4, 5]: return 'Printemps'
+    elif m in [6, 7, 8]: return 'Été'
+    return 'Automne'
+
+def get_time_period(hour):
+    if 6 <= hour <= 9: return 'Matin (Pointe)'
+    if 17 <= hour <= 20: return 'Soir (Pointe)'
+    if 10 <= hour <= 16: return 'Journée'
+    return 'Nuit'
+
+def analyze_context(row, pollutant, is_peak=True):
+    """Génère une explication physique basée sur le contexte temporel."""
+    if pd.isna(row.get('temps')): return "Contexte temporel inconnu."
+    
+    date = row['temps']
+    hour = date.hour
+    season = get_season(date)
+    period = get_time_period(hour)
+    is_weekend = date.dayofweek >= 5
+    
+    causes = []
+    
+    # --- ANALYSE PICS (Valeurs Hautes) ---
+    if is_peak:
+        if pollutant in ['PM10', 'PM2.5','PM1','PM4']:
+            if period in ['Matin (Pointe)', 'Soir (Pointe)'] and not is_weekend:
+                causes.append("trafic routier pendulaire")
+            if season in ['Hiver', 'Automne'] and period in ['Soir (Pointe)', 'Nuit']:
+                causes.append("chauffage résidentiel")
+            if season == 'Hiver' and period == 'Matin (Pointe)':
+                causes.append("conditions anticycloniques (air stable)")
+        
+        elif pollutant == 'CO2':
+            if season == 'Hiver': causes.append("confinement probable des locaux")
+            if period != 'Nuit': causes.append("activité humaine")
+            
+        elif pollutant == 'COV':
+            if season == 'Été' and period == 'Journée': causes.append("évaporation thermique")
+            if period in ['Matin (Pointe)', 'Soir (Pointe)']: causes.append("trafic routier")
+
+        if not causes: return "Evenement local spécifique."
+        return f"Favorisé par : {', '.join(causes)}."
+
+    # --- ANALYSE CREUX (Valeurs Basses) ---
+    else:
+        if pollutant in ['PM10', 'PM2.5', 'PM1','PM4', 'COV', 'CO2']:
+            if period == 'Nuit': causes.append("baisse de l'activité humaine")
+            if is_weekend: causes.append("réduction du trafic (week-end)")
+            if season in ['Automne', 'Hiver'] and period == 'Journée':
+                causes.append("dispersion par le vent ou lessivage")
+        
+        if pollutant == 'CO2' and season in ['Printemps', 'Été'] and period == 'Journée':
+            causes.append("ventilation ou photosynthèse")
+
+        if not causes: return "Conditions de fond bas."
+        return f"Peut-être expliqué par : {', '.join(causes)}."
+
+@app.route('/analyze_peaks', methods=['POST'])
+def analyze_peaks():
+    df = get_df_from_session()
+    if df is None: return jsonify({'error': 'Données non trouvées'}), 400
+    
+    req = request.json
+    raw_pollutant = req.get('pollutant')
+    
+    # Normalisation du nom
+    pollutant = ALIAS_MAP.get(raw_pollutant, raw_pollutant)
+    
+    # 1. Info Théorique (Toujours renvoyée)
+    knowledge = POLLUTANT_KNOWLEDGE.get(pollutant, {
+        'desc': "Paramètre non documenté.",
+        'hausse': "Facteurs spécifiques non définis.",
+        'baisse': "Facteurs spécifiques non définis."
+    })
+    
+    peaks_data = []
+    troughs_data = []
+
+    # 2. Analyse des Données
+    col_name = None
+    for col in df.columns:
+        if raw_pollutant.lower() in col.lower() or pollutant.lower() in col.lower():
+            col_name = col
+            break
+            
+    if col_name:
+        # PICS : Top 3 Max
+        top_peaks = df.nlargest(3, col_name)
+        for _, row in top_peaks.iterrows():
+            peaks_data.append({
+                'time': row['temps'].strftime('%d/%m %H:%M'),
+                'value': round(row[col_name], 2),
+                'context': analyze_context(row, pollutant, is_peak=True)
+            })
+            
+        # CREUX : Top 3 Min
+        top_troughs = df.nsmallest(3, col_name)
+        for _, row in top_troughs.iterrows():
+            troughs_data.append({
+                'time': row['temps'].strftime('%d/%m %H:%M'),
+                'value': round(row[col_name], 2),
+                'context': analyze_context(row, pollutant, is_peak=False)
+            })
+
+    return jsonify({
+        'pollutant': pollutant,
+        'knowledge': knowledge,
+        'peaks': peaks_data,
+        'troughs': troughs_data
+    }) 
 
 if __name__ == '__main__':
     app.run(debug=True)

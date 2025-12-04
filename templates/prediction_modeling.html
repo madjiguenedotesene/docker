@@ -8,11 +8,30 @@
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
-        /* Ajustement CSS pour le conteneur de la matrice de corrélation */
         #correlation-plot {
-            width: 100%; /* Prend toute la largeur disponible */
-            height: 500px; /* Hauteur fixe pour la matrice */
+            width: 100%; 
+            height: 500px;
         }
+        /* Style pour la modale */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        body.modal-active {
+            overflow-x: hidden;
+            overflow-y: visible !important;
+        }
+        /* Badges de performance pour le guide */
+        .perf-badge {
+            display: inline-block;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-right: 0.5rem;
+        }
+        .perf-good { background-color: #d1fae5; color: #065f46; border: 1px solid #34d399; } /* Vert */
+        .perf-avg { background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d; } /* Jaune */
+        .perf-bad { background-color: #fee2e2; color: #b91c1c; border: 1px solid #f87171; } /* Rouge */
     </style>
 </head>
 <body class="flex flex-col min-h-screen">
@@ -28,7 +47,6 @@
             </a>
         </div>
     </nav>
-
 
     <main class="container mx-auto p-8 flex-grow">
         
@@ -52,7 +70,18 @@
             
             <div id="correlation-plot" class="plot-container"></div>
             
-            <div class="p-6 md:p-10 text-center">
+            <!-- BOUTON ET ZONE D'EXPLICATION CORRÉLATIONS -->
+            <div class="mt-6 mb-4">
+                <button id="toggleCorrelationDetailsBtn" class="btn-gradient hidden mx-auto items-center justify-center">
+                    <span class="mr-2">🔍</span> Analyser les liens (PM10, Temp, CO2, COV)
+                </button>
+            </div>
+
+            <div id="top-correlations" class="px-6 pb-8 hidden transition-all duration-500">
+                <!-- Rempli par JS avec les tableaux d'explication -->
+            </div>
+
+            <div class="p-6 md:p-10 text-center border-t border-gray-100">
                 <button id="downloadCorrelationBtn" class="btn-gradient mt-4">Télécharger la matrice</button>
             </div>
         </div>
@@ -69,7 +98,7 @@
                         <select id="targetCol" name="targetCol" class="w-full p-2 border border-gray-300 rounded-md text-gray-900 focus:ring-2 focus:ring-blue-500"></select>
                     </div>
 
-                    <!-- Choix du Modèle (Correction ici) -->
+                    <!-- Choix du Modèle -->
                     <div>
                         <label for="modelSelect" class="block text-gray-700 font-bold mb-2">Modèles</label>
                         <select id="modelSelect" name="modelSelect" class="w-full p-2 border border-gray-300 rounded-md text-gray-900 focus:ring-2 focus:ring-blue-500">
@@ -80,7 +109,7 @@
                         </select>
                     </div>
 
-                    <!-- Variables Explicatives (Mise à jour label et suppression auto-filtrage) -->
+                    <!-- Variables Explicatives -->
                     <div>
                         <label for="explanatoryCols" class="block text-gray-700 font-bold mb-2">Variables Explicatives</label>
                         <select id="explanatoryCols" name="explanatoryCols" multiple class="w-full p-2 border border-gray-300 rounded-md h-32 text-gray-900 focus:ring-2 focus:ring-blue-500"></select>
@@ -100,8 +129,6 @@
         <div id="results-section" class="main-card p-6 md:p-10 text-center hidden">
             <h2 class="text-2xl font-bold mb-4 text-gray-800">Résultats de la Prédiction</h2>
             
-           
-
             <!-- Métriques de performance -->
             <div id="prediction-metrics" class="bg-gray-100 p-6 rounded-2xl mb-8 text-left text-gray-800 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Rempli dynamiquement par JS -->
@@ -111,19 +138,102 @@
             <div id="prediction-plot" class="plot-container"></div> 
             
             <div id="table-container-wrapper">
-                 <button id="toggleTableBtn" class="btn-gradient mt-4 mb-4">Afficher le Tableau des Prédictions</button>
+                 <button id="toggleTableBtn" class="btn-gradient mt-4 mb-4">Voir le Tableau des Prédictions</button>
                  <div id="predictionTableContainer" class="data-table mt-4 hidden">
                     <!-- Table remplie dynamiquement par JS -->
                  </div>
             </div>
 
             <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
+                <!-- BOUTON : AIDE AU CHOIX DU MODÈLE (MODIFIÉ) -->
+                <button id="validateModelBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition transform hover:scale-105 flex items-center border-2 border-white/20">
+                    <span class="mr-2 text-xl">📊</span> 
+                    <span>Interpréter & Choisir le Modèle</span>
+                </button>
+                
                 <button id="downloadPredictionBtn" class="btn-gradient">Télécharger le graphique</button>
                 <button onclick="window.location.href='/comparaison'" class="btn-gradient">Aller à la page de comparaison</button>
             </div>
         </div>
 
     </main>
+
+    <!-- MODALE DE GUIDE D'INTERPRÉTATION -->
+    <div id="validation-modal" class="modal fixed w-full h-full top-0 left-0 flex items-center justify-center hidden z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-60 backdrop-blur-sm"></div>
+        
+        <div class="modal-container bg-white w-11/12 md:max-w-lg mx-auto rounded-2xl shadow-2xl z-50 overflow-y-auto transform scale-100 transition-transform duration-300">
+            
+            <!-- Header -->
+            <div class="modal-content py-5 text-left px-6">
+                <div class="flex justify-between items-center pb-4 border-b border-gray-200">
+                    <p class="text-2xl font-extrabold text-gray-800 flex items-center">
+                        <span class="text-blue-500 mr-2">🎓</span> Guide de Performance
+                    </p>
+                    <div class="modal-close cursor-pointer z-50 hover:bg-gray-100 p-2 rounded-full transition" id="closeModalCross">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+                            <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Body : Explication Pédagogique -->
+                <div class="my-5 space-y-6">
+                    
+                    <!-- 1. Comprendre le Score R² -->
+                    <div class="bg-indigo-50 p-5 rounded-xl border border-indigo-100">
+                        <h3 class="font-bold text-indigo-900 mb-2 text-lg">1. Le Score R² (La Fiabilité)</h3>
+                        <p class="text-sm text-gray-600 mb-3">Ce score indique à quel point le modèle "colle" à la réalité (max = 1).</p>
+                        
+                        <ul class="space-y-2">
+                            <li class="flex items-center">
+                                <span class="perf-badge perf-good">R² > 0.80</span> 
+                                <span class="text-sm text-gray-700 font-medium">Excellent. Prédictions très fiables.</span>
+                            </li>
+                            <li class="flex items-center">
+                                <span class="perf-badge perf-avg">0.60 - 0.80</span> 
+                                <span class="text-sm text-gray-700">Correct. Tendances respectées.</span>
+                            </li>
+                            <li class="flex items-center">
+                                <span class="perf-badge perf-bad">R² < 0.60</span> 
+                                <span class="text-sm text-gray-700">Faible. À ne pas choisir.</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- 2. Comprendre les Erreurs (MSE / MAE) -->
+                    <div class="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                        <h3 class="font-bold text-gray-800 mb-2 text-lg">2. La Marge d'Erreur (MSE)</h3>
+                        <p class="text-sm text-gray-600">
+                            C'est l'écart moyen entre la prédiction et la réalité. 
+                            <br><span class="font-bold text-blue-600">Objectif :</span> Avoir le chiffre le plus bas possible (proche de 0).
+                        </p>
+                    </div>
+
+                    <!-- 3. Conseil de choix -->
+                    <div class="p-4 border-2 border-dashed border-blue-200 rounded-xl bg-blue-50/50">
+                        <p class="text-sm text-blue-800 flex items-start">
+                            <span class="text-xl mr-2">💡</span>
+                            <span><strong>Conseil :</strong> Regardez les résultats ci-dessus. Le meilleur modèle est celui qui combine le <span class="font-bold text-green-600">R² le plus haut</span> (proche de 1) et le <span class="font-bold text-green-600">MSE le plus bas</span>.</span>
+                        </p>
+                    </div>
+
+                    <!-- 4. Lien externe -->
+                    <div class="mt-6 pt-4 border-t border-gray-100">
+                        <p class="text-gray-600 text-sm mb-3 font-medium">Une fois le modèle choisi, validez la tendance globale :</p>
+                        <a href="https://www.meteoart.com/europe/france" target="_blank" class="flex items-center justify-center w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 rounded-xl transition shadow-md transform hover:-translate-y-0.5">
+                            <span class="mr-2">🌍</span> Vérifier sur MeteoArt (France)
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="flex justify-end pt-2">
+                    <button id="closeModalBtn" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
         <div class="container mx-auto">
@@ -144,6 +254,8 @@
         const correlationSection = document.getElementById('correlation-section');
         const correlationPlot = document.getElementById('correlation-plot');
         const downloadCorrelationBtn = document.getElementById('downloadCorrelationBtn');
+        const topCorrelationDiv = document.getElementById('top-correlations'); 
+        const toggleCorrelationDetailsBtn = document.getElementById('toggleCorrelationDetailsBtn');
         
         const targetColSelect = document.getElementById('targetCol');
         const explanatoryColsSelect = document.getElementById('explanatoryCols');
@@ -166,15 +278,45 @@
         const correlationSpinner = document.getElementById('correlation-spinner');
         const toggleTableBtn = document.getElementById('toggleTableBtn');
 
+        // NOUVEAUX ÉLÉMENTS POUR LA MODALE
+        const validateModelBtn = document.getElementById('validateModelBtn');
+        const validationModal = document.getElementById('validation-modal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const closeModalCross = document.getElementById('closeModalCross');
+        const modalOverlay = document.querySelector('.modal-overlay');
+
         let allColumns = [];
-        // Mots clés pour l'auto-sélection
-        const targetKeywords = ['température', 'humidité','pm', 'cov', 'co2','iqa', 'lumière'];
-        const meteoKeywords = ['température', 'humidité', 'lumière','pression'];
-        const pollutantKeywords = ['pm', 'cov','iqa', 'co2'];
+        // Mise à jour des mots clés
+        const targetKeywords = ['température', 'humidité','pm10', 'cov', 'co2', 'lumière'];
+        const meteoKeywords = ['température', 'humidité', 'lumière','pression','co2'];
+        const pollutantKeywords = ['pm10', 'cov','iqa', 'co2'];
+        // AJOUT DES EXCLUSIONS STRICTES POUR DIFF ET ROSEE
         const permanentExclusionsKeywords = [
-             'la diff', 'le mois', 'la ville', 
-            'temps', 'date','nox' ,'le point rose',  'heure','point_de_rosee', 'diff_temp_rosee'
+             'la diff', 'le mois', 'la ville', 'rosee', 'diff',
+            'temps', 'date','nox' ,'le point rose',  'heure','point_de_rosee', 'diff_temp_rosee', 'diff_point_rosee','pm1','pm2_5','iqa'
         ];
+
+        // --- GESTION DE LA MODALE ---
+        const toggleModal = () => {
+            validationModal.classList.toggle('hidden');
+            document.body.classList.toggle('modal-active');
+        }
+
+        validateModelBtn.addEventListener('click', toggleModal);
+        closeModalBtn.addEventListener('click', toggleModal);
+        closeModalCross.addEventListener('click', toggleModal);
+        modalOverlay.addEventListener('click', toggleModal);
+
+        // --- GESTION DU TOGGLE EXPLICATION CORRÉLATION ---
+        toggleCorrelationDetailsBtn.addEventListener('click', () => {
+            if (topCorrelationDiv.classList.contains('hidden')) {
+                topCorrelationDiv.classList.remove('hidden');
+                toggleCorrelationDetailsBtn.innerHTML = '<span class="mr-2">🔼</span> Masquer les détails';
+            } else {
+                topCorrelationDiv.classList.add('hidden');
+                toggleCorrelationDetailsBtn.innerHTML = '<span class="mr-2">🔍</span> Analyser les liens (PM10, Temp, CO2, COV)';
+            }
+        });
 
         // --- Fonction d'agrégation horaire ---
         const aggregateToHourlyMean = (predictions) => {
@@ -184,7 +326,6 @@
 
             predictions.forEach((p) => {
                 const date = new Date(p.time.replace(' ', 'T'));
-                // Clé unique par heure (YYYY-MM-DD-HH)
                 const hourKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}`;
 
                 if (!hourlyGroups[hourKey]) {
@@ -196,7 +337,6 @@
                     };
                 }
                 
-                // On garde le timestamp le plus tôt pour l'affichage
                 if (date < hourlyGroups[hourKey].firstDateObj) {
                      hourlyGroups[hourKey].firstDateObj = date;
                      hourlyGroups[hourKey].firstTime = p.time;
@@ -221,11 +361,7 @@
                 };
             });
 
-            // Tri chronologique
-            aggregatedList.sort((a, b) => {
-                return 0; 
-            });
-            
+            aggregatedList.sort((a, b) => 0);
             return aggregatedList;
         };
 
@@ -301,14 +437,12 @@
             });
             
             populateSelect(explanatoryColsSelect, explanatoryColumns);
-            
-            // Sélectionner tout par défaut
             Array.from(explanatoryColsSelect.options).forEach(option => {
                 option.selected = true;
             });
         };
 
-        // --- Corrélation ---
+        // --- Corrélation & Analyse Top 3 ---
         const fetchCorrelationMatrix = async () => {
             correlationText.classList.add('hidden');
             correlationSpinner.classList.remove('hidden');
@@ -316,6 +450,9 @@
             displayMessage('', 'info');
             
             correlationPlot.innerHTML = '';
+            topCorrelationDiv.innerHTML = ''; // Reset
+            topCorrelationDiv.classList.add('hidden');
+            toggleCorrelationDetailsBtn.classList.add('hidden'); // Reset bouton toggle
             correlationSection.classList.remove('hidden'); 
 
             try {
@@ -332,6 +469,90 @@
                     };
                     Plotly.newPlot('correlation-plot', plotData.data, layout, { responsive: true });
                     displayMessage('', 'success');
+
+                    // --- CALCUL ET AFFICHAGE DES MEILLEURES CORRELATIONS ---
+                    try {
+                        const matrix = plotData.data[0].z;
+                        const labels = plotData.data[0].x;
+                        
+                        let topCorrHtml = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 text-left">';
+
+                        // Fonction pour générer le bloc HTML pour une catégorie
+                        const generateTopBlock = (keywords, title, colorClass) => {
+                            const targetIndices = labels.map((l, i) => {
+                                const lowerL = l.toLowerCase();
+                                // Vérifier si le label contient un mot-clé ET n'est pas exclu
+                                const isMatch = keywords.some(k => lowerL.includes(k));
+                                const isExcluded = permanentExclusionsKeywords.some(ex => lowerL.includes(ex));
+                                return (isMatch && !isExcluded) ? i : -1;
+                            }).filter(i => i !== -1);
+
+                            if (targetIndices.length === 0) return '';
+
+                            let html = `<div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                            <h4 class="font-bold text-${colorClass}-700 mb-3 text-lg border-b border-gray-100 pb-2 flex items-center">
+                                                ${title}
+                                            </h4>
+                                            <div class="space-y-4">`;
+
+                            targetIndices.forEach(idx => {
+                                const varName = labels[idx];
+                                const correlations = matrix[idx].map((val, i) => ({ name: labels[i], val: val }));
+                                
+                                const top3 = correlations
+                                    .filter(c => c.name !== varName)
+                                    // FILTRER EGALEMENT LES VARIABLES EXCLUES DE LA LISTE DES CORRÉLATIONS
+                                    .filter(c => !permanentExclusionsKeywords.some(ex => c.name.toLowerCase().includes(ex)))
+                                    .sort((a, b) => Math.abs(b.val) - Math.abs(a.val))
+                                    .slice(0, 3);
+
+                                html += `<div>
+                                            <p class="text-sm font-semibold text-gray-800 mb-1">Corrélations avec <span class="text-${colorClass}-600">${varName}</span> :</p>
+                                            <ul class="text-xs space-y-1 pl-2 border-l-2 border-${colorClass}-200">
+                                                ${top3.map(c => `
+                                                    <li class="flex justify-between items-center p-1 hover:bg-gray-50 rounded">
+                                                        <span class="text-gray-600 truncate mr-2" title="${c.name}">${c.name}</span>
+                                                        <span class="font-mono font-bold ${c.val > 0.5 ? 'text-green-600' : (c.val < -0.5 ? 'text-red-500' : 'text-gray-400')}">
+                                                            ${c.val > 0 ? '+' : ''}${c.val.toFixed(2)}
+                                                        </span>
+                                                    </li>
+                                                `).join('')}
+                                            </ul>
+                                         </div>`;
+                            });
+                            html += `</div></div>`;
+                            return html;
+                        };
+
+                        // GÉNÉRATION DES BLOCS POUR LES VARIABLES DEMANDÉES (PM10 seulement)
+                        // J'ai remis ['pm'] ici pour être sûr de capter les colonnes nommées "PM" ou "Particules"
+                        // Les exclusions de PM1 et PM2.5 se font via permanentExclusionsKeywords
+                        topCorrHtml += generateTopBlock(['pm'], ' Particules Fines', 'gray');
+                        topCorrHtml += generateTopBlock(['temp', 't°'], ' Température', 'red');
+                        topCorrHtml += generateTopBlock(['co2'], ' CO2 ', 'blue');
+                        topCorrHtml += generateTopBlock(['cov', 'voc'], 'COV', 'purple');
+                        
+                        topCorrHtml += '</div>';
+                        
+                        // Ajout de la ligne d'interprétation demandée
+                        topCorrHtml += `
+                            <div class="mt-6 bg-blue-50 p-4 rounded-lg border border-blue-100 text-sm text-blue-900 flex items-start">
+                                <span class="text-xl mr-2">💡</span>
+                                <p><strong>Interprétation :</strong> Une valeur proche de <span class="font-bold text-green-600">+1</span> signifie que les variables augmentent ensemble. Une valeur proche de <span class="font-bold text-red-500">-1</span> signifie qu'elles varient en sens inverse.</p>
+                            </div>
+                        `;
+
+                        if (topCorrHtml.includes('bg-white')) { // Vérifie qu'au moins un bloc a été créé
+                            topCorrelationDiv.innerHTML = topCorrHtml;
+                            toggleCorrelationDetailsBtn.classList.remove('hidden');
+                            toggleCorrelationDetailsBtn.classList.add('flex');
+                        }
+
+                    } catch (e) {
+                        console.error("Erreur lors du calcul des top corrélations JS", e);
+                    }
+                    // -------------------------------------------------------
+
                 } else {
                     displayMessage(result.error, 'error');
                     correlationSection.classList.add('hidden');
@@ -350,7 +571,7 @@
         // --- Entraînement et Prédiction ---
         const trainAndPredict = async () => {
             const targetCol = targetColSelect.value;
-            const selectedModelType = modelSelect.value; // 'all', 'lr', 'rf', 'gb'
+            const selectedModelType = modelSelect.value; 
             
             const featureCols = Array.from(explanatoryColsSelect.options)
                                          .filter(option => option.selected)
@@ -376,19 +597,14 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    // (Suppression du feedback visuel sur la sélection auto des variables)
-
-                    // 2. Préparer les données horaires pour chaque modèle
                     const preds_lr = aggregateToHourlyMean(result.predictions_lr || []);
                     const preds_rf = aggregateToHourlyMean(result.predictions_rf || []);
                     const preds_gb = aggregateToHourlyMean(result.predictions_gb || []);
 
-                    // 3. Configuration de l'affichage selon le choix utilisateur
                     let plotTraces = [];
                     let tableHeaders = `<th class="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Date/Heure</th>`;
                     let metricsHtml = '';
 
-                    // Fonctions utilitaires pour construire l'UI
                     const addMetric = (title, data) => {
                         if(!data) return;
                         metricsHtml += `
@@ -410,33 +626,28 @@
                         });
                     };
 
-                    // --- Logique conditionnelle d'affichage ---
                     const showLR = (selectedModelType === 'all' || selectedModelType === 'lr');
                     const showRF = (selectedModelType === 'all' || selectedModelType === 'rf');
                     const showGB = (selectedModelType === 'all' || selectedModelType === 'gb');
 
-                    // Construction Graphique & Métriques
                     if (showLR) {
                         addMetric("Régression Linéaire", result.results['Linear Regression']);
-                        addTrace("Régression Linéaire", 'rgb(46, 204, 113)', preds_lr); // Vert
+                        addTrace("Régression Linéaire", 'rgb(46, 204, 113)', preds_lr); 
                         tableHeaders += `<th class="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Linéaire (Moy.)</th>`;
                     }
                     if (showRF) {
                         addMetric("Random Forest", result.results['Random Forest']);
-                        addTrace("Random Forest", 'rgb(75, 82, 255)', preds_rf); // Bleu
+                        addTrace("Random Forest", 'rgb(75, 82, 255)', preds_rf); 
                         tableHeaders += `<th class="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Rand. Forest (Moy.)</th>`;
                     }
                     if (showGB) {
                         addMetric("Gradient Boosting", result.results['Gradient Boosting']);
-                        addTrace("Gradient Boosting", 'rgb(255, 105, 180)', preds_gb); // Rose
+                        addTrace("Gradient Boosting", 'rgb(255, 105, 180)', preds_gb); 
                         tableHeaders += `<th class="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Grad. Boosting (Moy.)</th>`;
                     }
 
-                    // Mise à jour DOM Métriques
                     predictionMetricsDiv.innerHTML = metricsHtml;
 
-                    // Construction Tableau
-                    // On utilise la liste la plus longue comme référence de temps (elles devraient être identiques)
                     const timeRef = (preds_gb.length > 0 ? preds_gb : (preds_rf.length > 0 ? preds_rf : preds_lr));
                     
                     let tableBodyRows = timeRef.map((refItem, index) => {
@@ -469,7 +680,6 @@
                     
                     predictionTableContainer.innerHTML = tableHtml;
 
-                    // Affichage Graphique
                     const layout = {
                         title: `Prédictions futures pour ${targetCol}`,
                         xaxis: { title: 'Temps', type: 'category' },
@@ -480,7 +690,6 @@
 
                     Plotly.newPlot('prediction-plot', plotTraces, layout, { responsive: true });
                     
-                    // Finalisation UI
                     displayMessage('', 'success');
                     resultsSection.classList.remove('hidden');
                     redirectBtnContainer.classList.remove('hidden');
@@ -496,14 +705,12 @@
                 trainBtn.disabled = false;
                 trainText.classList.remove('hidden');
                 trainSpinner.classList.add('hidden');
-                // Resize graphique
                 setTimeout(() => {
                      if (document.getElementById('prediction-plot').data) Plotly.relayout('prediction-plot', {autosize: true});
                 }, 100);
             }
         };
 
-        // --- Event Listeners ---
         toggleTableBtn.addEventListener('click', function() {
             if (predictionTableContainer.classList.contains('hidden')) {
                 predictionTableContainer.classList.remove('hidden');
