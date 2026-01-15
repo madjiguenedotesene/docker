@@ -6,23 +6,10 @@
     <title>Comparaison Météo - PolluGard</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
     <style>
-        .result-card {
-            background: #ffffff;
-            color: black;
-            border-radius: 1.5rem;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
-            width: 100%;
-            margin-top: 2rem;
-            padding: 1.5rem;
-            display: flex;
-            height: 75vh;
-        }
-        .plot-container { width: 100%; height: 100%; }
         .loading-spinner {
             width: 20px; height: 20px;
             border: 2px solid rgba(255, 255, 255, 0.5);
@@ -31,16 +18,37 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-       
-        /* Animation pour le chargement */
-        .loading-spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #e5e7eb;
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+
+        /* --- STYLE FINAL POUR REMPLISSAGE TOTAL --- */
+        .result-card {
+            background: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            
+            /* Flexbox Vertical */
+            display: flex;
+            flex-direction: column;
+            
+            /* Dimensions */
+            height: 75vh; 
+            width: 100%; 
+            overflow: hidden;
+            padding: 1.5rem;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .plot-wrapper {
+            /* Prend tout l'espace disponible en hauteur */
+            flex-grow: 1; 
+            width: 100%; 
+            position: relative;
+            min-height: 0; /* Important pour Firefox/Flexbox */
+        }
+
+        /* Le conteneur interne de Plotly */
+        .js-plotly-plot, .plot-container {
+            width: 100% !important;
+            height: 100% !important;
+        }
     </style>
 </head>
 <body class="flex flex-col min-h-screen bg-gray-900">
@@ -56,77 +64,92 @@
         </div>
     </nav>
  
-    <main class="container-fluid py-5 px-md-4 flex-grow">
+    <main class="w-full px-4 md:px-8 lg:px-12 flex-grow mb-20 mt-16">
         
-        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Comparaison Météo</h1>
-        <p class="text-muted text-center mb-4"></p> 
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-8 text-white text-center">Comparaison Météo</h1>
 
-        <div class="main-card p-4 p-md-5">
-            <form id="comparison-form" class="mb-4">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-4">
-                        <label for="temp-column-select" class="form-label fw-bold">Colonne Température (°C)</label>
-                        <select id="temp-column-select" class="form-select" required disabled>
+        <div class="main-card p-6 md:p-10 text-center bg-white rounded-2xl shadow-xl max-w-6xl mx-auto">
+            <h2 class="text-2xl font-bold mb-6 text-gray-700">Configuration</h2>
+            
+            <form id="comparison-form" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label for="temp-column-select" class="block text-left text-gray-700 font-bold mb-2">Température (°C)</label>
+                        <select id="temp-column-select" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-purple-500 text-gray-900" required disabled>
                             <option value="Température" selected>Température</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <label for="humidity-column-select" class="form-label fw-bold">Colonne Humidité (%)</label>
-                        <select id="humidity-column-select" class="form-select" required disabled>
+                    <div>
+                        <label for="humidity-column-select" class="block text-left text-gray-700 font-bold mb-2">Humidité (%)</label>
+                        <select id="humidity-column-select" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-purple-500 text-gray-900" required disabled>
                             <option value="Humidité" selected>Humidité</option>
                         </select>
                     </div>
-                    
-                    <div class="col-md-4" id="city-input-container">
-                        <label for="city-input" class="form-label fw-bold">Ville de référence</label>
-                        <input type="text" id="city-input" class="form-control" placeholder="Chargement des villes..." required disabled>
+                    <div id="city-input-container">
+                        <label for="city-input" class="block text-left text-gray-700 font-bold mb-2">Ville de référence</label>
+                        <input type="text" id="city-input" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-purple-500 text-gray-900" placeholder="Chargement..." required disabled>
                     </div>
                 </div>
                 
-                <div class="text-center mt-4">
-                    <button type="submit" id="submit-btn" class="btn-gradient flex items-center justify-center mx-auto" disabled>
+                <div class="p-6 text-center border-t border-gray-100 mt-6">
+                    <button type="submit" id="submit-btn" class="btn-gradient px-8 py-3 text-lg" disabled>
                         <span id="btn-text">Lancer la Comparaison</span>
-                        <span id="loading-spinner" class="loading-spinner ml-2 hidden"></span>
+                        <span id="loading-spinner" class="loading-spinner ml-2 hidden inline-block"></span>
                     </button>
                 </div>
             </form>
-            <div id="message-container" class="mt-4"></div>
+            <div id="message-container" class="mt-4 text-lg font-medium"></div>
         </div>
 
-        <div id="results-container" class="hidden">
-            <h3 id="results-title" class="text-center fw-bold mt-5 mb-2 text-white"></h3>
+        <div id="results-container" class="hidden mt-12 space-y-12 w-full">
+            
             <div class="result-card">
-                <div id="temp-plot" class="plot-container"></div>
-            </div>
-            <div class="result-card">
-                <div id="humidity-plot" class="plot-container"></div>
+                <h3 class="text-2xl font-bold mb-2 text-gray-700 flex items-center justify-center gap-2 flex-none">
+                    🌡️ Comparaison Température
+                </h3>
+                <div class="plot-wrapper">
+                    <div id="temp-plot"></div>
+                </div>
             </div>
 
-            <div id="action-btn-container" class="mt-4 flex flex-wrap gap-4 justify-center hidden">
-                <button id="downloadGraphsBtn" class="btn-gradient">Télécharger les graphiques</button>
-                <a href="/" class="btn-gradient no-underline">Retour à l'accueil</a>
+            <div class="result-card">
+                <h3 class="text-2xl font-bold mb-2 text-gray-700 flex items-center justify-center gap-2 flex-none">
+                    💧 Comparaison Humidité
+                </h3>
+                <div class="plot-wrapper">
+                    <div id="humidity-plot"></div>
+                </div>
+            </div>
+
+            <div id="action-btn-container" class="hidden">
+                <div class="p-6 md:p-10 text-center border-t border-gray-100 bg-white rounded-2xl shadow-lg mt-8 max-w-6xl mx-auto">
+                    <button id="downloadGraphsBtn" class="btn-gradient m-2">📸 Télécharger les graphiques</button>
+                    <a href="/" class="btn-gradient m-2 inline-block no-underline">🏠 Retour Accueil</a>
+                </div>
             </div>
         </div>
     </main>
 
-    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+   <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
         <div class="container mx-auto">
             <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
                 <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
-                <a href="/upload-data" class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
+                <a href="/upload-data"/compare_with_meteo' class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
+                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧼 Nettoyage</a>
                 <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📈 Visualisation</a>
                 <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮 Prédiction</a>
-                <a href="/comparison" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
+                <a href="/comparaison" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
             </div>
+            </div>
+
         </div>
-    </footer>
+    </footer> 
     
    <script>
         document.addEventListener('DOMContentLoaded', function () {
             const form = document.getElementById('comparison-form');
             const messageContainer = document.getElementById('message-container');
             const resultsContainer = document.getElementById('results-container');
-            const resultsTitle = document.getElementById('results-title');
             const btnText = document.getElementById('btn-text');
             const loadingSpinner = document.getElementById('loading-spinner');
             const actionBtnContainer = document.getElementById('action-btn-container');
@@ -134,160 +157,124 @@
             const cityInputContainer = document.getElementById('city-input-container');
             const submitBtn = document.getElementById('submit-btn');
 
-            // --- 1. CHARGEMENT AUTOMATIQUE DES VILLES ---
+            // 1. CHARGEMENT VILLES
             fetch('/get_unique_cities')
-                .then(response => response.json())
+                .then(r => r.json())
                 .then(data => {
                     const cities = data.cities || [];
-                    
-                    // Nettoyer le conteneur
-                    // On garde le label, on supprime l'input existant
                     const label = cityInputContainer.querySelector('label');
-                    cityInputContainer.innerHTML = ''; 
-                    cityInputContainer.appendChild(label);
-
-                    let inputElement;
-
+                    cityInputContainer.innerHTML = ''; cityInputContainer.appendChild(label);
+                    
+                    let el;
                     if (cities.length > 0) {
-                        // CAS A : Des villes sont détectées -> Créer un SELECT
-                        inputElement = document.createElement('select');
-                        inputElement.id = 'city-input';
-                        inputElement.className = 'form-select';
-                        
+                        el = document.createElement('select');
+                        el.id = 'city-input';
+                        el.className = 'w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:ring-2 focus:ring-purple-500';
                         if (cities.length === 1) {
-                            // Si une seule ville, on la sélectionne directement
-                            const option = document.createElement('option');
-                            option.value = cities[0];
-                            option.textContent = cities[0];
-                            option.selected = true;
-                            inputElement.appendChild(option);
+                            const opt = new Option(cities[0], cities[0], true, true);
+                            el.add(opt);
                         } else {
-                            // Si plusieurs villes, on demande de choisir
-                            const defaultOption = document.createElement('option');
-                            defaultOption.value = "";
-                            defaultOption.textContent = "Choisissez une ville...";
-                            defaultOption.disabled = true;
-                            defaultOption.selected = true;
-                            inputElement.appendChild(defaultOption);
-
-                            cities.forEach(city => {
-                                const option = document.createElement('option');
-                                option.value = city;
-                                option.textContent = city;
-                                inputElement.appendChild(option);
-                            });
+                            el.add(new Option("Choisissez une ville...", "", true, true));
+                            cities.forEach(c => el.add(new Option(c, c)));
+                            el.options[0].disabled = true;
                         }
                     } else {
-                        // CAS B : Aucune ville détectée -> Créer un INPUT TEXT (fallback)
-                        inputElement = document.createElement('input');
-                        inputElement.type = 'text';
-                        inputElement.id = 'city-input';
-                        inputElement.className = 'form-control';
-                        inputElement.placeholder = 'Ex: Paris, France';
-                        inputElement.required = true;
+                        el = document.createElement('input');
+                        el.type = 'text'; el.id = 'city-input';
+                        el.className = 'w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:ring-2 focus:ring-purple-500';
+                        el.placeholder = 'Ex: Paris';
                     }
-
-                    cityInputContainer.appendChild(inputElement);
-                    submitBtn.disabled = false; // Activer le bouton
-                })
-                .catch(error => {
-                    console.error('Erreur chargement villes:', error);
-                    // Fallback en cas d'erreur API : Input text standard
-                    const label = cityInputContainer.querySelector('label');
-                    cityInputContainer.innerHTML = '';
-                    cityInputContainer.appendChild(label);
-                    
-                    const inputElement = document.createElement('input');
-                    inputElement.type = 'text';
-                    inputElement.id = 'city-input';
-                    inputElement.className = 'form-control';
-                    inputElement.placeholder = 'Ex: Paris, France';
-                    cityInputContainer.appendChild(inputElement);
+                    cityInputContainer.appendChild(el);
                     submitBtn.disabled = false;
-                });
+                })
+                .catch(e => console.error(e));
 
-            // --- 2. SOUMISSION DU FORMULAIRE ---
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-
-                const cityInput = document.getElementById('city-input');
-                const cityName = cityInput.value;
-
-                if (!cityName) {
-                    showMessage('Veuillez sélectionner ou saisir une ville.', 'danger');
-                    return;
-                }
+            // 2. SOUMISSION
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const city = document.getElementById('city-input').value;
+                if (!city) { showMessage('Ville requise.', 'error'); return; }
 
                 setLoading(true);
-                resultsContainer.classList.add('hidden');
-                actionBtnContainer.classList.add('hidden');
+                
+                // IMPORTANT : Ne pas cacher le container s'il est déjà là, sinon Plotly perd ses repères
                 messageContainer.innerHTML = '';
 
                 fetch('/compare_with_meteo', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        temp_col: "Température",
-                        humidity_col: "Humidité",
-                        city_name: cityName
-                    })
+                    body: JSON.stringify({ temp_col: "Température", humidity_col: "Humidité", city_name: city })
                 })
-                .then(response => response.json())
+                .then(r => r.json())
                 .then(data => {
                     setLoading(false);
                     if (data.status === 'success') {
                         displayResults(data);
-                    } else if (data.message) {
-                        showMessage(data.message, 'info');
-                    } else if (data.error) {
-                        showMessage(data.error, 'danger');
+                    } else {
+                        showMessage(data.error || data.message, 'error');
                     }
                 })
-                .catch(error => {
+                .catch(err => {
                     setLoading(false);
-                    showMessage('Une erreur inattendue est survenue.', 'danger');
-                    console.error('Error:', error);
+                    showMessage("Erreur technique.", 'error');
                 });
             });
 
+            // 3. AFFICHAGE DES RÉSULTATS (CORRECTION DU BUG D'ESPACE)
             function displayResults(data) {
-                resultsTitle.textContent = ``; 
-                const tempPlotData = JSON.parse(data.plots.temperature);
-                Plotly.newPlot('temp-plot', tempPlotData.data, tempPlotData.layout, {responsive: true});
-
-                const humidityPlotData = JSON.parse(data.plots.humidity);
-                Plotly.newPlot('humidity-plot', humidityPlotData.data, humidityPlotData.layout, {responsive: true});
-                
+                // ÉTAPE A : Rendre le conteneur visible AVANT de tracer
+                // Cela permet à Plotly de lire la vraie largeur de l'écran (w-full)
                 resultsContainer.classList.remove('hidden');
                 actionBtnContainer.classList.remove('hidden');
-                Plotly.Plots.resize(document.getElementById('temp-plot'));
-                Plotly.Plots.resize(document.getElementById('humidity-plot'));
+
+                // Config
+                const config = { responsive: true, displayModeBar: false, scrollZoom: true };
+                
+                // Layout Update : On force autosize et on retire les contraintes fixes
+                const layoutUpdate = { 
+                    autosize: true, 
+                    width: null, // Très important : laisse le CSS gérer la largeur
+                    height: null,
+                    margin: { l: 60, r: 20, t: 40, b: 40 } // Marges propres
+                };
+
+                // ÉTAPE B : Tracer les graphiques
+                const tempData = JSON.parse(data.plots.temperature);
+                Plotly.newPlot('temp-plot', tempData.data, Object.assign(tempData.layout, layoutUpdate), config);
+
+                const humData = JSON.parse(data.plots.humidity);
+                Plotly.newPlot('humidity-plot', humData.data, Object.assign(humData.layout, layoutUpdate), config);
+                
+                // ÉTAPE C : Forcer un redimensionnement immédiat (Double sécurité)
+                // Utile si le navigateur n'avait pas fini de calculer la mise en page
+                requestAnimationFrame(() => {
+                    Plotly.Plots.resize('temp-plot');
+                    Plotly.Plots.resize('humidity-plot');
+                });
+
+                // Scroll fluide
+                setTimeout(() => resultsContainer.scrollIntoView({ behavior: 'smooth' }), 100);
             }
 
-            downloadGraphsBtn.addEventListener('click', function() {
-                Plotly.downloadImage('temp-plot', { format: 'png', width: 1600, height: 900, filename: 'comparaison_temperature' });
-                Plotly.downloadImage('humidity-plot', { format: 'png', width: 1600, height: 900, filename: 'comparaison_humidite' });
+            downloadGraphsBtn.addEventListener('click', () => {
+                Plotly.downloadImage('temp-plot', { format: 'png', filename: 'temperature_comparaison', height: 1080, width: 1920 });
+                Plotly.downloadImage('humidity-plot', { format: 'png', filename: 'humidite_comparaison', height: 1080, width: 1920 });
             });
 
             function setLoading(isLoading) {
                 if (isLoading) {
-                    btnText.classList.add('hidden');
+                    btnText.textContent = "Comparaison en cours...";
                     loadingSpinner.classList.remove('hidden');
                     submitBtn.disabled = true;
                 } else {
-                    btnText.classList.remove('hidden');
+                    btnText.textContent = "Lancer la Comparaison";
                     loadingSpinner.classList.add('hidden');
                     submitBtn.disabled = false;
                 }
             }
 
-            function showMessage(message, type = 'info') {
-                const alertClass = (type === 'danger') ? 'alert alert-danger' : 'alert alert-info';
-                if (type === 'success') {
-                    messageContainer.innerHTML = '';
-                } else {
-                    messageContainer.innerHTML = `<div class="${alertClass} text-center" role="alert">${message}</div>`;
-                }
+            function showMessage(msg, type) {
+                messageContainer.innerHTML = `<div class="${type==='error'?'text-red-500':'text-gray-700'} font-bold">${msg}</div>`;
             }
         });
     </script>
