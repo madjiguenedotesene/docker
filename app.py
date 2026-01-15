@@ -1087,12 +1087,11 @@ def comparaison_page():
 # ------------------------------------------------------------------------------
 # 2. ROUTE POUR TRAITER LES DONNÉES ET GÉNÉRER LES GRAPHIQUES (MÉTHODE POST)
 # ------------------------------------------------------------------------------
-
 @app.route('/compare_with_meteo', methods=['POST']) 
 def compare_with_meteo():
     """
     Compare les données du capteur avec les données de Meteostat.
-    La ville est fournie directement par l'utilisateur.
+    La ville est fournie directement par l'utilisateur (via input ou select).
     """
     df = get_df_from_session()
     time_col = session.get('time_col')
@@ -1111,64 +1110,98 @@ def compare_with_meteo():
     city_name = req_data.get('city_name')
 
     if not all([temp_col, humidity_col, city_name]):
-        return jsonify({'error': "Veuillez sélectionner les colonnes et saisir un nom de ville."}), 400
+        return jsonify({'error': "Veuillez sélectionner les colonnes et choisir une ville."}), 400
 
     # Préparation des données utilisateur
-    df_prepared = df.copy()
-    df_prepared[time_col] = pd.to_datetime(df_prepared[time_col])
-    
-    start_date = df_prepared[time_col].min()
-    end_date = df_prepared[time_col].max()
+    try:
+        df_prepared = df.copy()
+        df_prepared[time_col] = pd.to_datetime(df_prepared[time_col], dayfirst=True) # dayfirst aide souvent
+        
+        start_date = df_prepared[time_col].min()
+        end_date = df_prepared[time_col].max()
+    except Exception as e:
+        return jsonify({'error': f"Erreur de format de date : {e}"}), 400
 
     # Géolocalisation de la ville
     try:
-        geolocator = Nominatim(user_agent="pollugard-app-v3", timeout=10)
+        # User-agent personnalisé pour éviter le blocage Nominatim
+        geolocator = Nominatim(user_agent="pollugard-app-v3-comparison", timeout=10)
         location = geolocator.geocode(city_name)
+        
         if location is None:
-            return jsonify({'error': f"La ville '{city_name}' n'a pas pu être géolocalisée."}), 400
+            return jsonify({'error': f"La ville '{city_name}' est introuvable. Vérifiez l'orthographe."}), 400
+            
         meteo_point = Point(location.latitude, location.longitude)
+        
     except Exception as e:
-        return jsonify({'error': f"Erreur de géolocalisation : {e}"}), 500
+        return jsonify({'error': f"Erreur de géolocalisation (service externe) : {e}"}), 500
 
     # Récupération des données Meteostat
     try:
         meteo_data = Hourly(meteo_point, start_date, end_date)
         meteo_df = meteo_data.fetch()
+        
         if meteo_df.empty:
-            return jsonify({'message': f"Aucune donnée météo trouvée pour {city_name} entre {start_date.date()} et {end_date.date()}."}), 200
+            return jsonify({'message': f"Aucune donnée météo officielle trouvée pour {city_name} sur cette période."}), 200
+            
     except Exception as e:
-        return jsonify({'error': f"Erreur lors de la récupération des données Meteostat : {e}"}), 500
+        return jsonify({'error': f"Erreur lors de la récupération Meteostat : {e}"}), 500
 
     # Fusion et alignement des données
-    local_timezone = 'Europe/Paris' # À adapter si nécessaire
-    # Ligne corrigée
-    meteo_df.index = meteo_df.index.tz_localize('UTC').tz_convert(local_timezone)
-    df_prepared[time_col] = df_prepared[time_col].dt.tz_localize(local_timezone, ambiguous='infer')
-    df_indexed = df_prepared.set_index(time_col)
-    
-    # Utiliser numeric_only=True pour éviter les avertissements sur les colonnes non-numériques
-    df_resampled = df_indexed.resample('H').mean(numeric_only=True) 
+    try:
+        local_timezone = 'Europe/Paris'
+        
+        # 1. Gestion Timezone Meteostat (toujours en UTC)
+        if meteo_df.index.tz is None:
+            meteo_df.index = meteo_df.index.tz_localize('UTC')
+        meteo_df.index = meteo_df.index.tz_convert(local_timezone)
 
-    comparison_df = pd.merge(df_resampled, meteo_df, left_index=True, right_index=True, how='inner')
+        # 2. Gestion Timezone Données Capteur
+        # Si les données n'ont pas de timezone, on suppose qu'elles sont déjà en local (Paris)
+        if df_prepared[time_col].dt.tz is None:
+            df_prepared[time_col] = df_prepared[time_col].dt.tz_localize(local_timezone, ambiguous='infer')
+        else:
+            df_prepared[time_col] = df_prepared[time_col].dt.tz_convert(local_timezone)
+            
+        df_indexed = df_prepared.set_index(time_col)
+        
+        # Rééchantillonnage horaire pour aligner avec Meteostat
+        df_resampled = df_indexed.resample('H').mean(numeric_only=True) 
 
-    if comparison_df.empty:
-        return jsonify({'message': 'Aucun chevauchement temporel trouvé entre vos données et les données météo.'}), 200
+        # Fusion (Inner join pour ne garder que les moments communs)
+        comparison_df = pd.merge(df_resampled, meteo_df, left_index=True, right_index=True, how='inner')
+
+        if comparison_df.empty:
+            return jsonify({'message': 'Les périodes de temps ne correspondent pas (aucun chevauchement).'}), 200
+
+    except Exception as e:
+        return jsonify({'error': f"Erreur lors du traitement temporel : {e}"}), 500
 
     # Création des graphiques Plotly
     plots = {}
 
     # Graphique Température
     fig_temp = go.Figure()
-    fig_temp.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df[temp_col], name='Température Capteur', mode='lines'))
-    fig_temp.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df['temp'], name='Température Meteostat', mode='lines'))
-    fig_temp.update_layout(title=f'Comparaison de Température ({city_name})', xaxis_title='Date', yaxis_title='Température (°C)')
+    fig_temp.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df[temp_col], name='Température Capteur', mode='lines', line=dict(color='blue')))
+    fig_temp.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df['temp'], name='Température Météo France/Station', mode='lines', line=dict(color='orange')))
+    fig_temp.update_layout(
+        title=f'Comparaison Température - {city_name}',
+        xaxis_title='Date',
+        yaxis_title='Température (°C)',
+        hovermode="x unified"
+    )
     plots['temperature'] = fig_temp.to_json()
 
     # Graphique Humidité
     fig_humidity = go.Figure()
-    fig_humidity.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df[humidity_col], name='Humidité Capteur', mode='lines'))
-    fig_humidity.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df['rhum'], name='Humidité Meteostat', mode='lines'))
-    fig_humidity.update_layout(title=f'Comparaison de l\'Humidité ({city_name})', xaxis_title='Date', yaxis_title='Humidité Relative (%)')
+    fig_humidity.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df[humidity_col], name='Humidité Capteur', mode='lines', line=dict(color='blue')))
+    fig_humidity.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df['rhum'], name='Humidité Météo France/Station', mode='lines', line=dict(color='orange')))
+    fig_humidity.update_layout(
+        title=f'Comparaison Humidité - {city_name}',
+        xaxis_title='Date',
+        yaxis_title='Humidité Relative (%)',
+        hovermode="x unified"
+    )
     plots['humidity'] = fig_humidity.to_json()
 
     return jsonify({
@@ -1176,173 +1209,265 @@ def compare_with_meteo():
         'city': city_name,
         'plots': plots
     })
-    
 
 # ==============================================================================
-# 🧠 MOTEUR D'ANALYSE ENVIRONNEMENTALE (PHYSIQUE & CONTEXTE)
+# 🧠 MOTEUR D'ANALYSE INTELLIGENT (CORRIGÉ)
 # ==============================================================================
-
-# 1. Base de Connaissance Théorique (Encyclopédie des Polluants)
+# ==============================================================================
+# 1. BASE DE CONNAISSANCE ENRICHIE (Agriculture, Industrie, BTP...)
+# ==============================================================================
 POLLUTANT_KNOWLEDGE = {
+    'PM': {
+        'desc': "Particules en suspension (Poussières, fumées).",
+        'hausse': "Trafic, Chauffage bois, Industrie, Agriculture, Chantiers.",
+        'baisse': "Pluie, Vent fort, Arrêt activité."
+    },
     'PM10': {
-        'desc': "Particules fines de diamètre inférieur à 10 micromètres, pouvant pénétrer dans les bronches.",
-        'hausse': "Trafic routier (gaz d'échappement, usure des pneus/freins), Chauffage au bois ou fioul, Chantiers BTP et poussières de voirie, Activité industrielle, Phénomènes d'inversion thermique (hiver) bloquant les polluants au sol.",
-        'baisse': "Lessivage par la pluie (les gouttes plaquent les poussières au sol), Vents forts favorisant la dispersion, Réduction de l'activité humaine (nuit, dimanche)."
+        'desc': "Particules < 10µm (Irritantes).",
+        'hausse': "Chauffage, Usure routes/freins, Épandages agricoles, Chantiers BTP.",
+        'baisse': "Lessivage (Pluie), Dispersion."
     },
     'PM2.5': {
-        'desc': "Particules très fines (inférieures à 2.5 µm), dangereuses car elles pénètrent profondément dans les poumons.",
-        'hausse': "Combustion incomplète (moteurs diesel, chauffage résidentiel), Réactions chimiques secondaires entre gaz (ammoniac, oxydes d'azote) dans l'atmosphère.",
-        'baisse': "Précipitations durables, Brassage atmosphérique vertical (instabilité de l'air), Arrêt des combustions locales."
+        'desc': "Particules < 2.5µm (Nocives, pénètrent le sang).",
+        'hausse': "Combustion (Moteurs, Chaudières, Brûlage déchets verts), Industrie.",
+        'baisse': "Instabilité atmosphérique."
     },
     'COV': {
-        'desc': "Composés Organiques Volatils : gaz émis par certains produits ou combustions.",
-        'hausse': "Solvants et peintures (industrie/domestique), Trafic routier (imbrûlés), Végétation (isoprène émis par forte chaleur), Évaporation des réservoirs de carburant.",
-        'baisse': "Dégradation photochimique par le soleil (se transforme en ozone), Dispersion par le vent, Températures basses limitant l'évaporation."
+        'desc': "Composés Organiques Volatils (Chimie).",
+        'hausse': "Solvants, Peintures, Nettoyage, Industrie, Trafic.",
+        'baisse': "Vent, Photolyse (Soleil)."
     },
     'CO2': {
-        'desc': "Dioxyde de carbone, principal gaz à effet de serre et indicateur de confinement.",
-        'hausse': "Confinement (respiration humaine dans un espace clos), Combustion (chaudières, moteurs thermiques), Trafic routier dense à proximité.",
-        'baisse': "Ventilation efficace (ouverture fenêtres/VMC), Photosynthèse végétale (en journée uniquement), Absence d'occupants."
+        'desc': "Dioxyde de carbone (Confinement).",
+        'hausse': "Respiration humaine (salle pleine), Chaudières, Manque d'aération.",
+        'baisse': "Ouverture fenêtres, Végétation (jour)."
     },
-    
-    'Température': {
-        'desc': "Mesure de la chaleur de l'air ambiant.",
-        'hausse': "Ensoleillement direct, Îlot de chaleur urbain (béton/bitume), Arrivée d'une masse d'air chaud.",
-        'baisse': "Rayonnement nocturne (ciel clair), Couverture nuageuse, Pluie (évaporation refroidissante), Masse d'air polaire."
+    'NOX': {
+        'desc': "Oxydes d'azote (Marqueur combustion).",
+        'hausse': "Moteurs Diesel, Centrales thermiques, Industrie lourde.",
+        'baisse': "Réactions avec l'Ozone."
     },
-    'Humidité': {
-        'desc': "Quantité de vapeur d'eau présente dans l'air.",
-        'hausse': "Précipitations récentes, Transpiration végétale, Arrivée d'air maritime, Refroidissement nocturne (formation de rosée).",
-        'baisse': "Ensoleillement (assèchement), Vent de terre sec, Chauffage intérieur (hiver)."
-    }
+    'TEMPERATURE': {'desc': "Température air.", 'hausse': "Soleil, Activité urbaine.", 'baisse': "Nuit, Vent."},
+    'HUMIDITE': {'desc': "Humidité relative.", 'hausse': "Pluie, Respiration/Cuisine (intérieur).", 'baisse': "Soleil, Chauffage sec."}
 }
 
-ALIAS_MAP = {
-    'PM1': 'PM2.5', 'PM2_5': 'PM2.5', 'PM2.5': 'PM2.5','PM4':'PM10',
-    'VOC': 'COV', 'Temp': 'Température', 'HR': 'Humidité'
+
+
+# Mapping pour relier les noms de colonnes bizarres aux clés ci-dessus
+VAR_MAPPING = {
+    'temp': 'TEMPERATURE', 't°': 'TEMPERATURE',
+    'hum': 'HUMIDITE', 'rh': 'HUMIDITE',
+    'pm10': 'PM10', 'pm2.5': 'PM2.5', 'pm1': 'PM2.5', 'pm2_5': 'PM2.5',
+    'cov': 'COV', 'voc': 'COV',
+    'co2': 'CO2',
+    'nox': 'NOX',
+    'lum': 'LUMIERE', 'lux': 'LUMIERE'
 }
 
-def get_df_from_session():
-    filename = session.get('data_file')
-    if not filename: return None
-    file_path = os.path.join(app.config['DATA_FOLDER'], filename)
-    try: return pd.read_parquet(file_path)
-    except: return None
-
-def get_season(date):
-    if pd.isna(date): return ''
+def get_time_context(date):
+    h = date.hour
+    day = date.dayofweek
+    is_weekend = day >= 5
+    period = "Nuit"
+    if 6 <= h <= 9: period = "Pointe Matin"
+    elif 10 <= h <= 16: period = "Journée"
+    elif 17 <= h <= 20: period = "Pointe Soir"
+    season = "Automne"
     m = date.month
-    if m in [12, 1, 2]: return 'Hiver'
-    elif m in [3, 4, 5]: return 'Printemps'
-    elif m in [6, 7, 8]: return 'Été'
-    return 'Automne'
+    if m in [12, 1, 2]: season = "Hiver"
+    elif m in [3, 4, 5]: season = "Printemps"
+    elif m in [6, 7, 8]: season = "Été"
+    return period, season, is_weekend
 
-def get_time_period(hour):
-    if 6 <= hour <= 9: return 'Matin (Pointe)'
-    if 17 <= hour <= 20: return 'Soir (Pointe)'
-    if 10 <= hour <= 16: return 'Journée'
-    return 'Nuit'
-
-def analyze_context(row, pollutant, is_peak=True):
-    """Génère une explication physique basée sur le contexte temporel."""
-    if pd.isna(row.get('temps')): return "Contexte temporel inconnu."
+# ==============================================================================
+# 2. LOGIQUE D'ANALYSE AVANCÉE (Incluant Activités Humaines Diverses)
+# ==============================================================================
+def generate_explanation(knowledge_key, value, context):
+    """
+    Génère l'explication en croisant Polluant + Valeur + Temps + Activité Humaine
+    """
+    if not knowledge_key: return "Analyse non disponible."
     
-    date = row['temps']
-    hour = date.hour
-    season = get_season(date)
-    period = get_time_period(hour)
-    is_weekend = date.dayofweek >= 5
-    
+    period, season, is_weekend = context
     causes = []
+    key = knowledge_key.upper()
     
-    # --- ANALYSE PICS (Valeurs Hautes) ---
-    if is_peak:
-        if pollutant in ['PM10', 'PM2.5','PM1','PM4']:
-            if period in ['Matin (Pointe)', 'Soir (Pointe)'] and not is_weekend:
-                causes.append("trafic routier pendulaire")
-            if season in ['Hiver', 'Automne'] and period in ['Soir (Pointe)', 'Nuit']:
-                causes.append("chauffage résidentiel")
-            if season == 'Hiver' and period == 'Matin (Pointe)':
-                causes.append("conditions anticycloniques (air stable)")
+    # --- LOGIQUE PARTICULES (PM10, PM2.5) ---
+    if 'PM' in key:
+        # 1. Trafic (Classique)
+        if period in ['Pointe Matin', 'Pointe Soir'] and not is_weekend: 
+            causes.append("trafic routier pendulaire")
         
-        elif pollutant == 'CO2':
-            if season == 'Hiver': causes.append("confinement probable des locaux")
-            if period != 'Nuit': causes.append("activité humaine")
+        # 2. Chauffage (Hiver/Soir/Nuit)
+        if season in ['Hiver', 'Automne'] and period in ['Pointe Soir', 'Nuit']: 
+            causes.append("chauffage résidentiel (bois/fioul)")
+        
+        # 3. Agriculture (Printemps/Automne + Journée) -> Souvent oublié !
+        if season in ['Printemps', 'Automne'] and period == 'Journée':
+            causes.append("épandages agricoles ou labours (poussières)")
+
+        # 4. Industrie / Chantiers (Semaine + Journée)
+        if not is_weekend and period == 'Journée':
+            causes.append("activité industrielle ou chantiers BTP proches")
             
-        elif pollutant == 'COV':
-            if season == 'Été' and period == 'Journée': causes.append("évaporation thermique")
-            if period in ['Matin (Pointe)', 'Soir (Pointe)']: causes.append("trafic routier")
+        # 5. Météo (Hiver + Matin)
+        if season == 'Hiver' and period == 'Pointe Matin': 
+            causes.append("inversion thermique (polluants piégés)")
 
-        if not causes: return "Evenement local spécifique."
-        return f"Favorisé par : {', '.join(causes)}."
-
-    # --- ANALYSE CREUX (Valeurs Basses) ---
-    else:
-        if pollutant in ['PM10', 'PM2.5', 'PM1','PM4', 'COV', 'CO2']:
-            if period == 'Nuit': causes.append("baisse de l'activité humaine")
-            if is_weekend: causes.append("réduction du trafic (week-end)")
-            if season in ['Automne', 'Hiver'] and period == 'Journée':
-                causes.append("dispersion par le vent ou lessivage")
+    # --- LOGIQUE COV (Chimie) ---
+    elif 'COV' in key or 'VOC' in key:
+        # 1. Trafic
+        if period in ['Pointe Matin', 'Pointe Soir']: 
+            causes.append("gaz d'échappement")
         
-        if pollutant == 'CO2' and season in ['Printemps', 'Été'] and period == 'Journée':
-            causes.append("ventilation ou photosynthèse")
+        # 2. Activité Domestique / Bricolage (Week-end ou Journée)
+        if (is_weekend and period == 'Journée') or (period == 'Journée'):
+            causes.append("usage de solvants, peintures ou produits ménagers")
+            
+        # 3. Industrie (Semaine)
+        if not is_weekend and period == 'Journée':
+            causes.append("émissions industrielles (usines, pressings)")
 
-        if not causes: return "Conditions de fond bas."
-        return f"Peut-être expliqué par : {', '.join(causes)}."
+        # 4. Naturel (Été)
+        if season == 'Été' and period == 'Journée': 
+            causes.append("évaporation thermique (végétation/carburants)")
 
+    # --- LOGIQUE CO2 (Confinement) ---
+    elif 'CO2' in key:
+        # 1. Occupation Humaine
+        if value > 1000:
+            causes.append("forte occupation humaine (réunions, classe, foule)")
+        
+        # 2. Manque d'aération
+        if season == 'Hiver': 
+            causes.append("confinement (fenêtres fermées pour chauffer)")
+            
+        # 3. Combustion interne
+        if value > 600 and period == 'Journée':
+             causes.append("respiration ou cuisine (si capteur intérieur)")
+
+    # --- LOGIQUE NOX (Industrie/Route) ---
+    elif 'NOX' in key:
+        if period in ['Pointe Matin', 'Pointe Soir']:
+            causes.append("trafic routier (véhicules diesel)")
+        if not is_weekend and period == 'Journée':
+            causes.append("activités industrielles ou logistiques (camions)")
+
+    # --- LOGIQUE TEMPÉRATURE ---
+    elif 'TEMPERATURE' in key:
+        if value < 0: causes.append("gel hivernal")
+        elif value > 30: causes.append("canicule")
+        elif period == 'Journée': causes.append("ensoleillement")
+        elif period == 'Nuit': causes.append("refroidissement nocturne")
+
+    # --- LOGIQUE HUMIDITÉ ---
+    elif 'HUMIDITE' in key:
+        if value > 90: causes.append("temps pluvieux ou brouillard")
+        elif period == 'Nuit' and value > 70: causes.append("rosée nocturne")
+        elif period == 'Journée' and value < 40: causes.append("air sec / chauffage actif")
+
+    if not causes: 
+        return "Source locale indéterminée ou pollution de fond."
+
+    return f"Facteurs possibles : {', '.join(causes)}."
 @app.route('/analyze_peaks', methods=['POST'])
 def analyze_peaks():
-    df = get_df_from_session()
-    if df is None: return jsonify({'error': 'Données non trouvées'}), 400
-    
-    req = request.json
-    raw_pollutant = req.get('pollutant')
-    
-    # Normalisation du nom
-    pollutant = ALIAS_MAP.get(raw_pollutant, raw_pollutant)
-    
-    # 1. Info Théorique (Toujours renvoyée)
-    knowledge = POLLUTANT_KNOWLEDGE.get(pollutant, {
-        'desc': "Paramètre non documenté.",
-        'hausse': "Facteurs spécifiques non définis.",
-        'baisse': "Facteurs spécifiques non définis."
-    })
-    
-    peaks_data = []
-    troughs_data = []
+    try:
+        df = get_df_from_session()
+        if df is None: return jsonify({'error': 'Données non trouvées'}), 400
+        
+        req = request.json
+        raw_pollutant = req.get('pollutant', '') # ex: "Température (°C)" ou "PM10"
+        
+        # 1. Trouver la colonne de données dans le DataFrame
+        data_col = next((c for c in df.columns if raw_pollutant.lower() in c.lower()), None)
+        if not data_col: return jsonify({'error': f"Colonne '{raw_pollutant}' introuvable."}), 400
 
-    # 2. Analyse des Données
-    col_name = None
-    for col in df.columns:
-        if raw_pollutant.lower() in col.lower() or pollutant.lower() in col.lower():
-            col_name = col
-            break
+        # 2. Identifier la clé de connaissance (Normalisation)
+        # On cherche des bouts de mots (ex: "temp" dans "Température")
+        knowledge_key = None
+        normalized_name = "Variable Inconnue"
+        
+        for snippet, key in VAR_MAPPING.items():
+            if snippet in raw_pollutant.lower() or snippet in data_col.lower():
+                knowledge_key = key
+                normalized_name = key
+                break
+        
+        # 3. Récupérer les infos encyclopédiques
+        if knowledge_key:
+            knowledge = POLLUTANT_KNOWLEDGE.get(knowledge_key)
+        else:
+            # Cas par défaut pour variable inconnue
+            knowledge = {
+                'desc': "Aucune définition encyclopédique disponible pour cette variable.",
+                'hausse': "Non défini.",
+                'baisse': "Non défini."
+            }
+            normalized_name = raw_pollutant # On garde le nom original
+
+        # 4. Identification du Groupe (Ville)
+        group_col = next((c for c in df.columns if c.lower() in ['city', 'ville', 'commune', 'nom', 'source']), None)
+        
+        analysis_results = {}
+
+        def analyze_subset(sub_df, group_name):
+            valid_df = sub_df.dropna(subset=[data_col])
+            if valid_df.empty: return None
             
-    if col_name:
-        # PICS : Top 3 Max
-        top_peaks = df.nlargest(3, col_name)
-        for _, row in top_peaks.iterrows():
-            peaks_data.append({
-                'time': row['temps'].strftime('%d/%m %H:%M'),
-                'value': round(row[col_name], 2),
-                'context': analyze_context(row, pollutant, is_peak=True)
-            })
+            # Stats locales
+            local_mean = valid_df[data_col].mean()
+            local_max = valid_df[data_col].max()
+            local_min = valid_df[data_col].min()
             
-        # CREUX : Top 3 Min
-        top_troughs = df.nsmallest(3, col_name)
-        for _, row in top_troughs.iterrows():
-            troughs_data.append({
-                'time': row['temps'].strftime('%d/%m %H:%M'),
-                'value': round(row[col_name], 2),
-                'context': analyze_context(row, pollutant, is_peak=False)
-            })
+            # Pics (Top 3 Max)
+            peaks_df = valid_df.nlargest(3, data_col)
+            peaks_list = []
+            for _, row in peaks_df.iterrows():
+                ctx = get_time_context(row['temps'])
+                peaks_list.append({
+                    'time': row['temps'].strftime('%d/%m %H:%M'),
+                    'value': round(row[data_col], 2),
+                    'explanation': generate_explanation(knowledge_key, row[data_col], ctx)
+                })
 
-    return jsonify({
-        'pollutant': pollutant,
-        'knowledge': knowledge,
-        'peaks': peaks_data,
-        'troughs': troughs_data
-    }) 
+            # Creux (Top 3 Min)
+            troughs_df = valid_df.nsmallest(3, data_col)
+            troughs_list = []
+            for _, row in troughs_df.iterrows():
+                troughs_list.append({
+                    'time': row['temps'].strftime('%d/%m %H:%M'),
+                    'value': round(row[data_col], 2)
+                })
+            
+            return {
+                'stats': {
+                    'avg': round(local_mean, 2),
+                    'max': round(local_max, 2),
+                    'min': round(local_min, 2)
+                },
+                'peaks': peaks_list,
+                'troughs': troughs_list
+            }
 
+        # Exécution
+        if group_col:
+            groups = df[group_col].dropna().unique()
+            for g in groups:
+                res = analyze_subset(df[df[group_col] == g], str(g))
+                if res: analysis_results[str(g)] = res
+        else:
+            res = analyze_subset(df, "Analyse Globale")
+            if res: analysis_results["Global"] = res
+
+        return jsonify({
+            'pollutant': normalized_name, # Nom propre (ex: TEMPERATURE)
+            'knowledge': knowledge,
+            'analysis': analysis_results
+        })
+
+    except Exception as e:
+        print(f"ERREUR: {e}")
+        return jsonify({'error': str(e)}), 500
 if __name__ == '__main__':
     app.run(debug=True)

@@ -6,15 +6,8 @@
     <title>Comparaison Météo - PolluGard</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
-    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 
     <style>
@@ -27,37 +20,38 @@
             margin-top: 2rem;
             padding: 1.5rem;
             display: flex;
-            height: 75vh; /* Hauteur des cartes de résultat */
+            height: 75vh;
         }
-        
-        .plot-container {
-            width: 100%;
-            height: 100%;
-        }
-        
-        /* Spinner identique à celui de la page prédiction */
+        .plot-container { width: 100%; height: 100%; }
         .loading-spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.5); /* Bordure semi-transparente */
-            border-top-color: #ffffff; /* Bordure pleine en haut */
+            width: 20px; height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-top-color: #ffffff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+       
+        /* Animation pour le chargement */
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="flex flex-col min-h-screen bg-gray-900">
 
-    <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 bg-gray-900/90 backdrop-blur-md shadow-md">
         <div class="container mx-auto flex justify-between items-center relative h-10">
             <a href="/" class="h-10 flex items-center z-10">
-                 <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo Eurosmart Analytics" class="h-12">
+                 <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
             </a>
             <a href="/" class="h-10 flex items-center justify-end z-10">
-                 <img src="{{ url_for('static', filename='images/pollugard.png') }}" alt="Logo Pollugard" class="h-12">
+                 <img src="static/images/pollugard.png" alt="Logo Pollugard" class="h-12">
             </a>
         </div>
     </nav>
@@ -68,8 +62,6 @@
         <p class="text-muted text-center mb-4"></p> 
 
         <div class="main-card p-4 p-md-5">
-            <div class="text-center mb-4">
-                </div>
             <form id="comparison-form" class="mb-4">
                 <div class="row g-3 align-items-end">
                     <div class="col-md-4">
@@ -84,13 +76,15 @@
                             <option value="Humidité" selected>Humidité</option>
                         </select>
                     </div>
-                    <div class="col-md-4">
+                    
+                    <div class="col-md-4" id="city-input-container">
                         <label for="city-input" class="form-label fw-bold">Ville de référence</label>
-                        <input type="text" id="city-input" class="form-control" placeholder="Ex: Paris, France" required>
+                        <input type="text" id="city-input" class="form-control" placeholder="Chargement des villes..." required disabled>
                     </div>
                 </div>
+                
                 <div class="text-center mt-4">
-                    <button type="submit" class="btn-gradient flex items-center justify-center mx-auto">
+                    <button type="submit" id="submit-btn" class="btn-gradient flex items-center justify-center mx-auto" disabled>
                         <span id="btn-text">Lancer la Comparaison</span>
                         <span id="loading-spinner" class="loading-spinner ml-2 hidden"></span>
                     </button>
@@ -117,26 +111,18 @@
 
     <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
         <div class="container mx-auto">
-            <p class="text-sm mt-4"></p>
             <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
                 <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
                 <a href="/upload-data" class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
-                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧼 Nettoyage</a>
                 <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📈 Visualisation</a>
                 <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮 Prédiction</a>
                 <a href="/comparison" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
             </div>
-            <p class="text-sm mt-4"></p>
-            <p class="text-sm mt-2">
-                <span class="mr-2"></span>
-                <a href="tel:+33160626566" class="hover:underline"></a>
-            </p>
         </div>
     </footer>
     
    <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // Références aux éléments du DOM
             const form = document.getElementById('comparison-form');
             const messageContainer = document.getElementById('message-container');
             const resultsContainer = document.getElementById('results-container');
@@ -145,17 +131,90 @@
             const loadingSpinner = document.getElementById('loading-spinner');
             const actionBtnContainer = document.getElementById('action-btn-container');
             const downloadGraphsBtn = document.getElementById('downloadGraphsBtn');
+            const cityInputContainer = document.getElementById('city-input-container');
+            const submitBtn = document.getElementById('submit-btn');
 
-            // Logique de soumission du formulaire
+            // --- 1. CHARGEMENT AUTOMATIQUE DES VILLES ---
+            fetch('/get_unique_cities')
+                .then(response => response.json())
+                .then(data => {
+                    const cities = data.cities || [];
+                    
+                    // Nettoyer le conteneur
+                    // On garde le label, on supprime l'input existant
+                    const label = cityInputContainer.querySelector('label');
+                    cityInputContainer.innerHTML = ''; 
+                    cityInputContainer.appendChild(label);
+
+                    let inputElement;
+
+                    if (cities.length > 0) {
+                        // CAS A : Des villes sont détectées -> Créer un SELECT
+                        inputElement = document.createElement('select');
+                        inputElement.id = 'city-input';
+                        inputElement.className = 'form-select';
+                        
+                        if (cities.length === 1) {
+                            // Si une seule ville, on la sélectionne directement
+                            const option = document.createElement('option');
+                            option.value = cities[0];
+                            option.textContent = cities[0];
+                            option.selected = true;
+                            inputElement.appendChild(option);
+                        } else {
+                            // Si plusieurs villes, on demande de choisir
+                            const defaultOption = document.createElement('option');
+                            defaultOption.value = "";
+                            defaultOption.textContent = "Choisissez une ville...";
+                            defaultOption.disabled = true;
+                            defaultOption.selected = true;
+                            inputElement.appendChild(defaultOption);
+
+                            cities.forEach(city => {
+                                const option = document.createElement('option');
+                                option.value = city;
+                                option.textContent = city;
+                                inputElement.appendChild(option);
+                            });
+                        }
+                    } else {
+                        // CAS B : Aucune ville détectée -> Créer un INPUT TEXT (fallback)
+                        inputElement = document.createElement('input');
+                        inputElement.type = 'text';
+                        inputElement.id = 'city-input';
+                        inputElement.className = 'form-control';
+                        inputElement.placeholder = 'Ex: Paris, France';
+                        inputElement.required = true;
+                    }
+
+                    cityInputContainer.appendChild(inputElement);
+                    submitBtn.disabled = false; // Activer le bouton
+                })
+                .catch(error => {
+                    console.error('Erreur chargement villes:', error);
+                    // Fallback en cas d'erreur API : Input text standard
+                    const label = cityInputContainer.querySelector('label');
+                    cityInputContainer.innerHTML = '';
+                    cityInputContainer.appendChild(label);
+                    
+                    const inputElement = document.createElement('input');
+                    inputElement.type = 'text';
+                    inputElement.id = 'city-input';
+                    inputElement.className = 'form-control';
+                    inputElement.placeholder = 'Ex: Paris, France';
+                    cityInputContainer.appendChild(inputElement);
+                    submitBtn.disabled = false;
+                });
+
+            // --- 2. SOUMISSION DU FORMULAIRE ---
             form.addEventListener('submit', function (event) {
                 event.preventDefault();
 
-                const selectedTempCol = "Température";
-                const selectedHumidityCol = "Humidité";
-                const cityName = document.getElementById('city-input').value;
+                const cityInput = document.getElementById('city-input');
+                const cityName = cityInput.value;
 
                 if (!cityName) {
-                    showMessage('Veuillez saisir un nom de ville.', 'danger'); // Type changé en 'danger' pour erreur
+                    showMessage('Veuillez sélectionner ou saisir une ville.', 'danger');
                     return;
                 }
 
@@ -168,8 +227,8 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        temp_col: selectedTempCol,
-                        humidity_col: selectedHumidityCol,
+                        temp_col: "Température",
+                        humidity_col: "Humidité",
                         city_name: cityName
                     })
                 })
@@ -178,9 +237,8 @@
                     setLoading(false);
                     if (data.status === 'success') {
                         displayResults(data);
-                        // Message de succès supprimé
                     } else if (data.message) {
-                        showMessage(data.message, 'info'); // Garde les messages d'info (ex: "Ville trouvée")
+                        showMessage(data.message, 'info');
                     } else if (data.error) {
                         showMessage(data.error, 'danger');
                     }
@@ -188,14 +246,12 @@
                 .catch(error => {
                     setLoading(false);
                     showMessage('Une erreur inattendue est survenue.', 'danger');
-                    console.error('Error during comparison:', error);
+                    console.error('Error:', error);
                 });
             });
 
-            // Fonction pour afficher les résultats
             function displayResults(data) {
-                resultsTitle.textContent = ``; // Titre vidé
-                
+                resultsTitle.textContent = ``; 
                 const tempPlotData = JSON.parse(data.plots.temperature);
                 Plotly.newPlot('temp-plot', tempPlotData.data, tempPlotData.layout, {responsive: true});
 
@@ -204,36 +260,29 @@
                 
                 resultsContainer.classList.remove('hidden');
                 actionBtnContainer.classList.remove('hidden');
-                
-                // Forcer le redimensionnement des graphiques
                 Plotly.Plots.resize(document.getElementById('temp-plot'));
                 Plotly.Plots.resize(document.getElementById('humidity-plot'));
             }
 
-            // Logique du bouton de téléchargement
             downloadGraphsBtn.addEventListener('click', function() {
                 Plotly.downloadImage('temp-plot', { format: 'png', width: 1600, height: 900, filename: 'comparaison_temperature' });
                 Plotly.downloadImage('humidity-plot', { format: 'png', width: 1600, height: 900, filename: 'comparaison_humidite' });
             });
 
-            // Fonctions utilitaires
             function setLoading(isLoading) {
                 if (isLoading) {
                     btnText.classList.add('hidden');
                     loadingSpinner.classList.remove('hidden');
-                    form.querySelector('button').disabled = true;
+                    submitBtn.disabled = true;
                 } else {
                     btnText.classList.remove('hidden');
                     loadingSpinner.classList.add('hidden');
-                    form.querySelector('button').disabled = false;
+                    submitBtn.disabled = false;
                 }
             }
 
             function showMessage(message, type = 'info') {
-                // Style pour les messages d'erreur dans la carte principale
                 const alertClass = (type === 'danger') ? 'alert alert-danger' : 'alert alert-info';
-                
-                // Ne pas afficher les messages de succès
                 if (type === 'success') {
                     messageContainer.innerHTML = '';
                 } else {

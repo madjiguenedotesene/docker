@@ -380,3 +380,68 @@ body {
             border: 1px solid rgba(255, 255, 255, 0.3);
             color: white;
         }
+
+    /* ========================================================= */
+/* FIX: TEXTE INVISIBLE DANS LES SÉLECTEURS */
+/* ========================================================= */
+/* Le body a color: white, donc par défaut les inputs héritent.
+   On force le noir pour les champs de formulaire sur fond blanc. */
+select, input, textarea {
+    color: #1f2937 !important; /* Gris très fonce/Noir */
+    background-color: #ffffff !important;
+    font-weight: 500;
+}
+
+/* Optionnel : Style quand on clique dessus */
+select:focus, input:focus {
+    outline: 2px solid #a742b7;
+    border-color: #a742b7;
+}
+
+/* ========================================================= */
+/* FIX: TAILLE DU GRAPHIQUE (GRAND FORMAT) */
+/* ========================================================= */
+.plot-container-wrapper {
+    width: 100%;
+    /* On enlève les paddings inutiles qui écrasent le graphe */
+    padding: 0; 
+}
+
+.plot-container {
+    width: 100%;
+    /* Hauteur forcee plus grande pour le "Grand Format" */
+    height: 700px !important; 
+    min-height: 700px !important;
+    
+    /* Style cosmétique */
+    border: none;
+    border-radius: 1rem;
+    background-color: white; /* Fond blanc pour le graphe */
+}
+
+/* ========================================================= */
+/* FIX: UNIFORMISATION DES BOUTONS */
+/* ========================================================= */
+/* S'applique à tous les boutons pour qu'ils aient le style gradient */
+button, .btn-style {
+    background: linear-gradient(135deg, #a742b7, #4b52ff, #ff69b4); 
+    color: white; 
+    font-weight: bold; 
+    border-radius: 9999px; 
+    border: none; 
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); 
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+button:hover, .btn-style:hover { 
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4); 
+}
+
+button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}  

@@ -32,21 +32,32 @@
         .perf-good { background-color: #d1fae5; color: #065f46; border: 1px solid #34d399; } /* Vert */
         .perf-avg { background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d; } /* Jaune */
         .perf-bad { background-color: #fee2e2; color: #b91c1c; border: 1px solid #f87171; } /* Rouge */
+
+        
+        /* Animation pour le chargement */
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="flex flex-col min-h-screen bg-gray-900">
 
-    <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 bg-gray-900/90 backdrop-blur-md shadow-md">
         <div class="container mx-auto flex justify-between items-center relative h-10">
             <a href="/" class="h-10 flex items-center z-10">
                  <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
             </a>
-            
             <a href="/" class="h-10 flex items-center justify-end z-10">
                  <img src="static/images/pollugard.png" alt="Logo Pollugard" class="h-12">
             </a>
         </div>
     </nav>
+
 
     <main class="container mx-auto p-8 flex-grow">
         

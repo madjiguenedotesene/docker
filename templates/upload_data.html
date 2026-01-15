@@ -7,25 +7,20 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
-        /* Style personnalisé pour la barre de défilement de la liste */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+        /* Animation pour le chargement */
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.5);
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="flex flex-col min-h-screen bg-gray-900">
 
-    <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 bg-gray-900/90 backdrop-blur-md shadow-md">
         <div class="container mx-auto flex justify-between items-center relative h-10">
             <a href="/" class="h-10 flex items-center z-10">
                  <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">

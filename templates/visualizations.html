@@ -7,10 +7,22 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    
+    <style>
+        /* Animation pour le chargement */
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="flex flex-col min-h-screen bg-gray-900">
 
-    <nav class="fixed top-0 left-0 w-full z-10 p-4 top-nav">
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 bg-gray-900/90 backdrop-blur-md shadow-md">
         <div class="container mx-auto flex justify-between items-center relative h-10">
             <a href="/" class="h-10 flex items-center z-10">
                  <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
@@ -21,100 +33,112 @@
         </div>
     </nav>
 
-    <main class="container mx-auto p-8 flex-grow mb-20"> 
-        <h1 class="text-3xl md:text-4xl font-extrabold mb-4 text-white text-center">Visualisation des Données</h1>
+    <main class="container mx-auto p-4 md:p-8 flex-grow mb-20 mt-16"> 
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-8 text-white text-center">Visualisation des Données</h1>
         
-        <!-- CARTE DE SÉLECTION -->
-        <div id="selection-card" class="main-card p-6 md:p-10 text-center">
-            <h2 class="text-2xl font-bold mb-6 text-gray-700">Configuration</h2>
-            <form id="plot-form" class="space-y-4">
-                <div class="flex flex-col md:flex-row md:space-x-4 md:space-y-0 space-y-4">
-                    <div class="flex-1">
+        <div id="selection-card" class="bg-white rounded-2xl p-6 md:p-10 shadow-2xl text-center max-w-5xl mx-auto">
+            <h2 class="text-2xl font-bold mb-6 text-gray-700">Configuration du Graphique</h2>
+            <form id="plot-form" class="space-y-6">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
                         <label for="plotType" class="block text-left text-gray-700 font-bold mb-2">Type de Graphique</label>
-                        <select id="plotType" name="plotType" class="w-full p-2 border border-gray-300 rounded-md">
-                            <option value="line">Lignes</option>
+                        <select id="plotType" name="plotType" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                            <option value="line">Lignes (Temporel)</option>
                             <option value="bar">Barres</option>
                             <option value="scatter">Nuage de points</option>
                             <option value="box">Boîte à moustaches</option>
                             <option value="distribution_histogram">Histogramme de distribution</option>
-                            <option value="pie">Secteurs</option>
+                            <option value="pie">Secteurs (Camembert)</option>
                         </select>
                     </div>
-                    <div id="x-col-container" class="flex-1">
-                        <label for="xCol" class="block text-left text-gray-700 font-bold mb-2">Variable en X</label>
-                        <select id="xCol" name="xCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                    <div id="x-col-container">
+                        <label for="xCol" class="block text-left text-gray-700 font-bold mb-2">Variable en X (Axe horizontal)</label>
+                        <select id="xCol" name="xCol" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50"></select>
                     </div>
                 </div>
 
-                <div class="flex flex-col md:flex-row md:space-x-4 md:space-y-0 space-y-4">
-                    <div id="y-col-container" class="flex-1">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div id="y-col-container" class="md:col-span-1">
                         <label for="yCol" class="block text-left text-gray-700 font-bold mb-2">Variable en Y</label>
-                        <select id="yCol" name="yCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                        <select id="yCol" name="yCol" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50"></select>
                     </div>
-                    <div id="color-col-container" class="flex-1">
-                        <label for="colorCol" class="block text-left text-gray-700 font-bold mb-2">Variable à colorer</label>
-                        <select id="colorCol" name="colorCol" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                    <div id="color-col-container" class="md:col-span-1">
+                        <label for="colorCol" class="block text-left text-gray-700 font-bold mb-2">Colorer par</label>
+                        <select id="colorCol" name="colorCol" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50"></select>
                     </div>
-                    <div id="color-type-container" class="flex-1">
-                        <label for="colorType" class="block text-left text-gray-700 font-bold mb-2">Variable à catégoriser</label>
-                        <select id="colorType" name="colorType" class="w-full p-2 border border-gray-300 rounded-md"></select>
+                    <div id="color-type-container" class="md:col-span-1">
+                        <label for="colorType" class="block text-left text-gray-700 font-bold mb-2">Catégorie Seuils</label>
+                        <select id="colorType" name="colorType" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50"></select>
                     </div>
-                    <div id="city-filter-container" class="flex-1">
-                        <label for="city-filter" class="block text-left text-gray-700 font-bold mb-2">Choix de la Ville</label>
-                        <select id="city-filter" name="city-filter" class="w-full p-2 border border-gray-300 rounded-md">
-                            <option value="">Tous les villes</option>
+                    <div id="city-filter-container" class="md:col-span-1">
+                        <label for="city-filter" class="block text-left text-gray-700 font-bold mb-2">Filtrer Ville</label>
+                        <select id="city-filter" name="city-filter" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50">
+                            <option value="">Toutes</option>
                         </select>
                     </div>
                 </div>
 
-                <button type="submit" class="btn-gradient w-full md:w-auto mt-6">Générer le graphique</button>
+                <button type="submit" class="w-full md:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-800 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-900 transition-all transform hover:scale-105 shadow-lg">
+                    Générer le graphique
+                </button>
             </form>
         </div>
         
-        <!-- CARTE DE RÉSULTAT -->
-        <div id="plot-card" class="main-card p-6 md:p-10 text-center mt-8 hidden">
-            <h2 class="text-2xl font-bold mb-6 text-gray-700">Résultat</h2>
-            <div id="message-container" class="mt-4 text-center text-lg"></div>
+        <div id="plot-card" class="bg-white rounded-2xl p-6 md:p-8 shadow-2xl text-center mt-8 hidden max-w-6xl mx-auto">
+            <h2 class="text-2xl font-bold mb-4 text-gray-700">Visualisation</h2>
+            <div id="message-container" class="mt-2 text-center text-lg font-medium"></div>
             
-            <div class="plot-container-wrapper">
-                <div id="plot-container" class="w-full h-96"></div>
+            <div class="plot-container-wrapper w-full bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                <div id="plot-container" class="w-full min-h-[600px]"></div>
             </div>
 
-            <!-- BOUTON D'ANALYSE (Style harmonisé) -->
             <div id="analysis-trigger-container" class="mt-8 hidden">
-                <button id="trigger-analysis-btn" class="btn-gradient flex items-center justify-center mx-auto text-lg">
-                    <span class="mr-2">🔍</span> Lancer l'analyse des Causes & Pics
+                <button id="trigger-analysis-btn" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 flex items-center mx-auto">
+                    <span class="mr-2 text-xl">🧠</span> Lancer l'Analyse 
                 </button>
             </div>
 
-            <!-- ZONE DE RÉSULTATS ANALYSE (Structure modifiée) -->
-            <div id="analysis-results" class="mt-12 text-left max-w-6xl mx-auto hidden transition-all duration-500 space-y-8">
-                <!-- Injection JS ici -->
-            </div>
+            <div id="analysis-results" class="mt-12 text-left w-full hidden space-y-8 animate-fade-in-up">
+                </div>
 
-            <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
-                <button id="downloadPlotBtn" class="btn-gradient">Télécharger le graphique </button>
-                <button onclick="window.location.href='/prediction-modeling'" class="btn-gradient">Aller à la page Prédiction</button>
+            <div id="redirect-btn-container" class="p-6 md:p-10 text-center border-t border-gray-100 hidden">
+                <button id="downloadPlotBtn" class="btn-gradient mt-4">📸 Télécharger l'image</button>
+                <button onclick="window.location.href='/prediction-modeling'" class="btn-gradient mt-4 ml-4">🔮 Vers les Prédictions</button>
             </div>
         </div>
     </main>
 
-    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center"></footer>
+    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+        <div class="container mx-auto">
+            <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
+                <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
+                <a href="/upload-data" class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
+                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧼 Nettoyage</a>
+                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📈 Visualisation</a>
+                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮 Prédiction</a>
+                <a href="/comparaison" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
+            </div>
+        </div>
+    </footer>
 
     <script>
-        // --- VARIABLES ---
+        // --- DOM ELEMENTS ---
         const messageContainer = document.getElementById('message-container');
         const plotForm = document.getElementById('plot-form');
         const plotContainer = document.getElementById('plot-container');
+        
+        // Selects
         const xColSelect = document.getElementById('xCol');
         const yColSelect = document.getElementById('yCol');
         const colorColSelect = document.getElementById('colorCol');
         const colorTypeSelect = document.getElementById('colorType');
         const plotTypeSelect = document.getElementById('plotType');
         const cityFilterSelect = document.getElementById('city-filter');
+        
+        // Buttons & Containers
         const redirectBtnContainer = document.getElementById('redirect-btn-container');
         const downloadPlotBtn = document.getElementById('downloadPlotBtn');
-        
         const analysisBtnContainer = document.getElementById('analysis-trigger-container');
         const analysisBtn = document.getElementById('trigger-analysis-btn');
         const analysisResults = document.getElementById('analysis-results');
@@ -123,7 +147,7 @@
         let timeColumns = []; 
         let currentPollutant = null;
 
-        // Mappage des noms de colonnes pour la coloration automatique
+        // Mapping pour les catégories de couleurs
         const columnTypeMapping = {
             'temp': { value: 'temperature', text: 'Température' }, 
             'hum': { value: 'humidity', text: 'Humidité' }, 
@@ -135,108 +159,170 @@
             'lum': { value: 'light', text: 'Luminosité' }, 
         };
 
-        // --- FONCTION D'ANALYSE (Style harmonisé) ---
+        // =====================================================================
+        // 🧠 MOTEUR D'ANALYSE FRONTEND (FONCTION CÔTÉ CLIENT)
+        // =====================================================================
         const runAnalysis = async () => {
             if (!currentPollutant) return;
             
+            // 1. Affichage État Chargement
             analysisResults.classList.remove('hidden');
-            analysisResults.innerHTML = '<div class="flex flex-col items-center justify-center p-12"><div class="loading-spinner mb-4 border-gray-400 border-l-blue-600"></div><p class="text-blue-600 font-semibold">Analyse en cours...</p></div>';
+            analysisResults.innerHTML = `
+                <div class="flex flex-col items-center justify-center p-12 bg-white rounded-2xl shadow-inner">
+                    <div class="loading-spinner mb-4"></div>
+                    <p class="text-blue-600 font-semibold animate-pulse">L'IA analyse vos données (Seuils, Météo, Contexte)...</p>
+                </div>`;
             
             try {
+                // 2. Appel API
                 const response = await fetch('/analyze_peaks', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ pollutant: currentPollutant })
                 });
                 const data = await response.json();
-                
-               
-                let html = `
-                    <!-- BLOC 1 : THÉORIE (Causes Probables Générales) -->
-                    <div class="bg-white text-black rounded-[2rem] shadow-[0_10px_30px_rgba(255,105,180,0.2)] overflow-hidden transition-transform duration-500 hover:-translate-y-1">
-                        <div class="bg-gray-50 px-8 py-5 border-b border-gray-100">
-                            <h3 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#a742b7] to-[#ff69b4] flex items-center">
-                                Comprendre le paramètre : <span class="ml-2 text-gray-700">${data.pollutant}</span>
-                            </h3>
-                            <p class="text-sm text-gray-600 mt-2 italic">${data.knowledge.desc}</p>
-                        </div>
-                        <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div>
-                                <h4 class="font-bold text-red-500 mb-4 flex items-center text-lg">
-                                    <span class="bg-red-100 p-1.5 rounded-lg mr-2 text-sm">▲</span> Facteurs de Hausse
-                                </h4>
-                                <p class="text-gray-700 leading-relaxed text-sm bg-gray-50 p-5 rounded-2xl border border-red-50 shadow-sm h-full">
-                                    ${data.knowledge.hausse}
-                                </p>
-                            </div>
-                            <div>
-                                <h4 class="font-bold text-green-500 mb-4 flex items-center text-lg">
-                                    <span class="bg-green-100 p-1.5 rounded-lg mr-2 text-sm">▼</span> Facteurs de Baisse
-                                </h4>
-                                <p class="text-gray-700 leading-relaxed text-sm bg-gray-50 p-5 rounded-2xl border border-green-50 shadow-sm h-full">
-                                    ${data.knowledge.baisse}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- BLOC 2 : PRATIQUE (Analyse des Données Réelles) -->
-                    <div class="bg-white text-black rounded-[2rem] shadow-[0_10px_30px_rgba(255,105,180,0.2)] overflow-hidden transition-transform duration-500 hover:-translate-y-1">
-                        <div class="bg-gray-50 px-8 py-5 border-b border-gray-100">
-                            <h3 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#a742b7] to-[#ff69b4] flex items-center">
-                                📊 Analyse du graphe
-                            </h3>
+                // Gestion d'erreur serveur
+                if(data.error) {
+                     analysisResults.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert"><p class="font-bold">Erreur</p><p>${data.error}</p></div>`;
+                     return;
+                }
+                
+                let html = '';
+
+                // --- 3. BLOC ENCYCLOPÉDIE (Seulement si info disponible) ---
+                if (data.knowledge && data.knowledge.desc && data.knowledge.desc !== "Aucune définition encyclopédique disponible pour cette variable.") {
+                    html += `
+                        <div class="bg-white text-gray-800 rounded-[1.5rem] shadow-lg overflow-hidden border border-gray-100 mb-8 relative">
+                            <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
+                            <div class="p-6 md:p-8">
+                                <h3 class="text-2xl font-bold text-blue-800 mb-4 flex items-center">
+                                    <span class="bg-blue-100 p-2 rounded-lg mr-3 text-2xl">📚</span> 
+                                    Comprendre : ${data.pollutant}
+                                </h3>
+                                <p class="text-gray-700 text-lg mb-6 leading-relaxed">${data.knowledge.desc}</p>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="bg-red-50 p-5 rounded-xl border border-red-100">
+                                        <span class="font-bold text-red-600 block mb-2 text-sm uppercase tracking-wider">▲ Facteurs de Hausse</span> 
+                                        <span class="text-gray-800">${data.knowledge.hausse}</span>
+                                    </div>
+                                    <div class="bg-green-50 p-5 rounded-xl border border-green-100">
+                                        <span class="font-bold text-green-600 block mb-2 text-sm uppercase tracking-wider">▼ Facteurs de Baisse</span> 
+                                        <span class="text-gray-800">${data.knowledge.baisse}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    `;
+                } else {
+                    // Message si pas d'info encyclopédique
+                    html += `
+                        <div class="bg-gray-100 p-4 rounded-xl text-center text-gray-500 mb-8 border border-gray-200">
+                            ℹ️ Aucune analyse encyclopédique disponible pour la variable <strong>${data.pollutant}</strong>.
+                            <br><span class="text-xs">L'analyse statistique reste disponible ci-dessous.</span>
+                        </div>
+                    `;
+                }
+
+                // --- 4. BLOC VILLES / STATISTIQUES ---
+                const cities = Object.keys(data.analysis);
+                
+                if (cities.length === 0) {
+                    html += `<div class="bg-yellow-50 p-6 rounded-xl text-center text-yellow-700 border border-yellow-200">⚠️ Aucune donnée suffisante pour générer une analyse statistique.</div>`;
+                } else {
+                    cities.forEach(cityName => {
+                        const cityData = data.analysis[cityName];
+
+                        html += `
+                        <div class="bg-white rounded-[1.5rem] shadow-xl overflow-hidden mb-10 transition-all hover:shadow-2xl border border-gray-200">
                             
-                            <!-- PICS (Valeurs Hautes) -->
-                            <div>
-                                <h4 class="font-bold text-red-500 mb-4 border-b-2 border-red-100 pb-2 text-lg">Pics les plus élevés</h4>
-                                ${data.peaks.length > 0 ? data.peaks.map(p => `
-                                    <div class="mb-4 bg-red-50 p-4 rounded-2xl border-l-4 border-red-400 shadow-sm hover:shadow-md transition-shadow">
-                                        <div class="flex justify-between items-center mb-2">
-                                            <span class="font-mono text-xs text-gray-500 bg-white px-2 py-1 rounded-lg border border-gray-100">${p.time}</span>
-                                            <span class="font-bold text-red-600 text-xl">${p.value}</span>
-                                        </div>
-                                        <p class="text-sm text-gray-700 italic flex items-start">
-                                            <span class="mr-2">💡</span> ${p.context}
-                                        </p>
+                            <div class="bg-gray-800 p-6 text-white flex flex-col md:flex-row justify-between items-center">
+                                <div class="flex items-center gap-3 mb-4 md:mb-0">
+                                    <span class="text-3xl">📍</span>
+                                    <h4 class="text-2xl font-bold capitalize tracking-tight">${cityName}</h4>
+                                </div>
+                                
+                                <div class="flex gap-4">
+                                    <div class="flex flex-col items-center bg-gray-700 px-4 py-2 rounded-xl border border-gray-600 shadow-sm">
+                                        <span class="text-gray-400 text-xs font-bold uppercase">Moyenne</span>
+                                        <span class="text-lg font-mono font-bold">${cityData.stats.avg}</span>
                                     </div>
-                                `).join('') : '<p class="text-gray-400 italic text-center py-4">Aucune donnée significative.</p>'}
+                                    <div class="flex flex-col items-center bg-green-900/60 px-4 py-2 rounded-xl border border-green-700 shadow-sm">
+                                        <span class="text-green-300 text-xs font-bold uppercase">Min</span>
+                                        <span class="text-lg font-mono font-bold text-green-100">${cityData.stats.min}</span>
+                                    </div>
+                                    <div class="flex flex-col items-center bg-red-900/60 px-4 py-2 rounded-xl border border-red-700 shadow-sm">
+                                        <span class="text-red-300 text-xs font-bold uppercase">Max</span>
+                                        <span class="text-lg font-mono font-bold text-red-100">${cityData.stats.max}</span>
+                                    </div>
+                                </div>
                             </div>
 
-                            <!-- CREUX (Valeurs Basses) -->
-                            <div>
-                                <h4 class="font-bold text-green-500 mb-4 border-b-2 border-green-100 pb-2 text-lg">Creux les plus bas</h4>
-                                ${data.troughs.length > 0 ? data.troughs.map(t => `
-                                    <div class="mb-4 bg-green-50 p-4 rounded-2xl border-l-4 border-green-400 shadow-sm hover:shadow-md transition-shadow">
-                                        <div class="flex justify-between items-center mb-2">
-                                            <span class="font-mono text-xs text-gray-500 bg-white px-2 py-1 rounded-lg border border-gray-100">${t.time}</span>
-                                            <span class="font-bold text-green-600 text-xl">${t.value}</span>
-                                        </div>
-                                        <p class="text-sm text-gray-700 italic flex items-start">
-                                            <span class="mr-2">💡</span> ${t.context}
-                                        </p>
+                            <div class="p-6 md:p-8 bg-gray-50 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-red-100 relative overflow-hidden">
+                                    <div class="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+                                    <h5 class="font-bold text-red-600 mb-6 flex items-center gap-2 text-lg">
+                                        <span class="bg-red-100 p-1.5 rounded-lg text-xl">📈</span> Pics les plus hauts
+                                    </h5>
+                                    
+                                    <div class="space-y-4">
+                                        ${cityData.peaks.length > 0 ? cityData.peaks.map(p => `
+                                            <div class="flex flex-col bg-red-50/50 p-4 rounded-xl border-l-4 border-red-500 hover:bg-red-50 transition-colors">
+                                                <div class="flex justify-between items-center mb-2">
+                                                    <span class="text-xs font-bold text-gray-500 uppercase tracking-wide bg-white px-2 py-0.5 rounded border border-gray-200">${p.context_str}</span>
+                                                    <span class="font-mono text-sm text-gray-500">${p.time}</span>
+                                                </div>
+                                                <div class="flex justify-between items-end">
+                                                    <p class="text-sm text-gray-800 leading-snug w-3/4 pr-2">${p.explanation}</p>
+                                                    <span class="text-2xl font-bold text-red-600">${p.value}</span>
+                                                </div>
+                                            </div>
+                                        `).join('') : '<p class="text-gray-400 text-sm italic">Aucun pic significatif détecté.</p>'}
                                     </div>
-                                `).join('') : '<p class="text-gray-400 italic text-center py-4">Aucune donnée significative.</p>'}
+                                </div>
+
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-green-100 relative overflow-hidden">
+                                    <div class="absolute top-0 left-0 w-full h-1 bg-green-500"></div>
+                                    <h5 class="font-bold text-green-600 mb-6 flex items-center gap-2 text-lg">
+                                        <span class="bg-green-100 p-1.5 rounded-lg text-xl">📉</span> Creux les plus bas
+                                    </h5>
+                                    
+                                    <div class="space-y-4">
+                                        ${cityData.troughs.length > 0 ? cityData.troughs.map(t => `
+                                            <div class="flex items-center justify-between bg-green-50/50 p-4 rounded-xl border-l-4 border-green-500 hover:bg-green-50 transition-colors">
+                                                <div class="flex flex-col">
+                                                    <span class="font-mono text-sm text-gray-500 mb-1">📅 ${t.time}</span>
+                                                    <span class="text-xs text-green-700 font-medium">Conditions calmes / Normales</span>
+                                                </div>
+                                                <span class="text-2xl font-bold text-green-600">${t.value}</span>
+                                            </div>
+                                        `).join('') : '<p class="text-gray-400 text-sm italic">Aucun creux significatif.</p>'}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                `;
+                        </div>`;
+                    });
+                }
                 
+                // Injection et Scroll
                 analysisResults.innerHTML = html;
-                // Scroll automatique vers les résultats
                 analysisResults.scrollIntoView({behavior: 'smooth', block: 'start'});
                 
             } catch (e) {
                 console.error(e);
-                analysisResults.innerHTML = '<p class="text-red-500 text-center bg-red-50 p-4 rounded-xl">Erreur technique lors de l\'analyse.</p>';
+                analysisResults.innerHTML = '<p class="text-red-500 text-center bg-red-50 p-4 rounded-xl">Erreur technique lors de l\'analyse client.</p>';
             }
         };
 
+        // Ecouteur Bouton Analyse
         analysisBtn.addEventListener('click', runAnalysis);
 
-        // --- FONCTIONS UTILITAIRES GRAPHIQUE ---
+
+        // =====================================================================
+        // 🛠️ FONCTIONS UTILITAIRES & INITIALISATION
+        // =====================================================================
 
         const normalizeString = (str) => {
             if (!str) return '';
@@ -247,7 +333,7 @@
             if (type === 'success') { messageContainer.textContent = ''; } 
             else { 
                 messageContainer.textContent = msg; 
-                messageContainer.style.color = (type === 'error') ? '#ff4d4d' : 'black'; 
+                messageContainer.style.color = (type === 'error') ? '#dc2626' : '#1f2937'; 
             }
         };
 
@@ -255,18 +341,17 @@
             selectElement.innerHTML = '';
             if (includeEmpty) {
                 const emptyOption = document.createElement('option');
-                emptyOption.value = "";
-                emptyOption.textContent = emptyText;
+                emptyOption.value = ""; emptyOption.textContent = emptyText;
                 selectElement.appendChild(emptyOption);
             }
             options.forEach(option => {
                 const opt = document.createElement('option');
-                opt.value = option;
-                opt.textContent = option;
+                opt.value = option; opt.textContent = option;
                 selectElement.appendChild(opt);
             });
         };
 
+        // Chargement infos colonnes
         const fetchDataFrameInfo = async () => {
             try {
                 const response = await fetch('/get_data_info');
@@ -274,28 +359,26 @@
                 if (response.ok) {
                     allColumns = result.data_info.columns;
                     timeColumns = allColumns.filter(col => 
-                        normalizeString(col).includes('date') || 
-                        normalizeString(col).includes('heure') ||
-                        normalizeString(col).includes('temps')
+                        normalizeString(col).includes('date') || normalizeString(col).includes('heure') || normalizeString(col).includes('temps')
                     );
                     const nonTimeColumns = allColumns.filter(col => !timeColumns.includes(col));
                     populateSelect(yColSelect, nonTimeColumns);
-                    updateXColOptions();
-                    updateColorColOptions();
+                    updateXColOptions(); updateColorColOptions();
                 } else { displayMessage(result.error, 'error'); }
             } catch (error) { displayMessage('Erreur chargement colonnes.', 'error'); }
         };
 
+        // Chargement villes
         const fetchUniqueCities = async () => {
             try {
                 const response = await fetch('/get_unique_cities');
                 const result = await response.json();
-                if (response.ok && result.cities) {
-                    populateSelect(cityFilterSelect, result.cities, true, 'Toutes les villes');
-                } else { document.getElementById('city-filter-container').style.display = 'none'; }
+                if (response.ok && result.cities) { populateSelect(cityFilterSelect, result.cities, true, 'Toutes les villes'); } 
+                else { document.getElementById('city-filter-container').style.display = 'none'; }
             } catch (error) { document.getElementById('city-filter-container').style.display = 'none'; }
         };
 
+        // Mise à jour options Axe X
         const updateXColOptions = () => {
             const plotType = plotTypeSelect.value;
             const xColContainer = document.getElementById('x-col-container');
@@ -307,10 +390,7 @@
                     const timeColName = timeColumns[0];
                     populateSelect(xColSelect, [timeColName], false, timeColName);
                     xColSelect.disabled = true; 
-                } else {
-                    populateSelect(xColSelect, ['Date/Heure non trouvée']);
-                    xColSelect.disabled = true;
-                }
+                } else { populateSelect(xColSelect, ['Date/Heure non trouvée']); xColSelect.disabled = true; }
             } else {
                 const nonTimeColumns = allColumns.filter(col => !timeColumns.includes(col));
                 if (['pie', 'box', 'scatter'].includes(plotType)) { populateSelect(xColSelect, nonTimeColumns); } 
@@ -319,6 +399,7 @@
             updateColorColOptions();
         };
         
+        // Mise à jour options Couleur
         const updateColorColOptions = () => {
             const plotType = plotTypeSelect.value;
             const xCol = xColSelect.value;
@@ -345,6 +426,7 @@
             updateColorTypeOptions();
         };
 
+        // Gestion affichage champs selon type graph
         const togglePlotOptions = () => {
             const plotType = plotTypeSelect.value;
             updateXColOptions();
@@ -355,6 +437,7 @@
             updateColorColOptions();
         };
 
+        // Mise à jour auto catégorie couleur
         const updateColorTypeOptions = () => {
             const selectedCol = colorColSelect.value;
             colorTypeSelect.innerHTML = '';
@@ -375,11 +458,14 @@
             } else { colorTypeSelect.value = "none"; }
         };
 
+        // =====================================================================
+        // 🚀 SOUMISSION FORMULAIRE & GÉNÉRATION GRAPHIQUE
+        // =====================================================================
         plotForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             document.getElementById('plot-card').classList.remove('hidden');
-            analysisBtnContainer.classList.add('hidden'); // Reset bouton analyse
-            analysisResults.classList.add('hidden'); // Reset résultats
+            analysisBtnContainer.classList.add('hidden'); 
+            analysisResults.classList.add('hidden'); 
             
             const plotType = plotTypeSelect.value;
             const xCol = xColSelect.value;
@@ -392,7 +478,7 @@
             if (!xCol || xCol === 'Date/Heure non trouvée') { displayMessage('Sélectionnez un axe X valide.', 'error'); return; }
             if (['scatter', 'bar', 'line'].includes(plotType) && !yCol) { displayMessage('Sélectionnez un axe Y.', 'error'); return; }
 
-            displayMessage('Génération...', 'info');
+            displayMessage('Génération du graphique...', 'info');
 
             try {
                 const response = await fetch('/generate_plot', {
@@ -400,18 +486,24 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ plotType, xCol, yCol, colorCol, colorType, city }),
                 });
-
                 const result = await response.json();
                 
                 if (response.ok) {
                     const plotData = JSON.parse(result.plot_json);
-                    Plotly.newPlot('plot-container', plotData.data, plotData.layout, { responsive: true });
+                    
+                    // --- CONFIG PLOTLY (Barre de zoom masquée) ---
+                    const config = {
+                        responsive: true,
+                        displayModeBar: false, 
+                        scrollZoom: true
+                    };
+
+                    Plotly.newPlot('plot-container', plotData.data, plotData.layout, config);
                     displayMessage('', 'success'); 
                     redirectBtnContainer.classList.remove('hidden');
 
-                    // --- DETECTION POLLUANT POUR ANALYSE ---
                     if (yCol) {
-                        currentPollutant = yCol; // Sauvegarde pour le bouton
+                        currentPollutant = yCol; 
                         analysisBtnContainer.classList.remove('hidden');
                     }
                 } else {
@@ -421,16 +513,19 @@
             } catch (error) { displayMessage('Erreur inattendue.', 'error'); }
         });
 
+        // Téléchargement Image
         downloadPlotBtn.addEventListener('click', () => {
             Plotly.downloadImage('plot-container', { format: 'png', filename: 'graphique_eurosmart' });
         });
 
+        // Init
         document.addEventListener('DOMContentLoaded', () => {
             fetchDataFrameInfo();
             fetchUniqueCities();
             togglePlotOptions();
         });
 
+        // Listeners
         plotTypeSelect.addEventListener('change', togglePlotOptions);
         xColSelect.addEventListener('change', updateColorColOptions);
         yColSelect.addEventListener('change', updateColorColOptions);
