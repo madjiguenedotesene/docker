@@ -18,6 +18,14 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .animate-fade-in-up {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body class="flex flex-col min-h-screen bg-gray-900">
@@ -39,7 +47,6 @@
         <div id="selection-card" class="bg-white rounded-2xl p-6 md:p-10 shadow-2xl text-center max-w-5xl mx-auto">
             <h2 class="text-2xl font-bold mb-6 text-gray-700">Configuration du Graphique</h2>
             <form id="plot-form" class="space-y-6">
-                
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label for="plotType" class="block text-left text-gray-700 font-bold mb-2">Type de Graphique</label>
@@ -99,8 +106,7 @@
                 </button>
             </div>
 
-            <div id="analysis-results" class="mt-12 text-left w-full hidden space-y-8 animate-fade-in-up">
-                </div>
+            <div id="analysis-results" class="mt-12 text-left w-full hidden space-y-8 animate-fade-in-up"></div>
 
             <div id="redirect-btn-container" class="p-6 md:p-10 text-center border-t border-gray-100 hidden">
                 <button id="downloadPlotBtn" class="btn-gradient mt-4">📸 Télécharger l'image</button>
@@ -127,16 +133,12 @@
         const messageContainer = document.getElementById('message-container');
         const plotForm = document.getElementById('plot-form');
         const plotContainer = document.getElementById('plot-container');
-        
-        // Selects
         const xColSelect = document.getElementById('xCol');
         const yColSelect = document.getElementById('yCol');
         const colorColSelect = document.getElementById('colorCol');
         const colorTypeSelect = document.getElementById('colorType');
         const plotTypeSelect = document.getElementById('plotType');
         const cityFilterSelect = document.getElementById('city-filter');
-        
-        // Buttons & Containers
         const redirectBtnContainer = document.getElementById('redirect-btn-container');
         const downloadPlotBtn = document.getElementById('downloadPlotBtn');
         const analysisBtnContainer = document.getElementById('analysis-trigger-container');
@@ -147,7 +149,6 @@
         let timeColumns = []; 
         let currentPollutant = null;
 
-        // Mapping pour les catégories de couleurs
         const columnTypeMapping = {
             'temp': { value: 'temperature', text: 'Température' }, 
             'hum': { value: 'humidity', text: 'Humidité' }, 
@@ -160,21 +161,19 @@
         };
 
         // =====================================================================
-        // 🧠 MOTEUR D'ANALYSE FRONTEND (FONCTION CÔTÉ CLIENT)
+        // 🧠 MOTEUR D'ANALYSE FRONTEND
         // =====================================================================
         const runAnalysis = async () => {
             if (!currentPollutant) return;
             
-            // 1. Affichage État Chargement
             analysisResults.classList.remove('hidden');
             analysisResults.innerHTML = `
                 <div class="flex flex-col items-center justify-center p-12 bg-white rounded-2xl shadow-inner">
                     <div class="loading-spinner mb-4"></div>
-                    <p class="text-blue-600 font-semibold animate-pulse">L'IA analyse vos données (Seuils, Météo, Contexte)...</p>
+                    <p class="text-blue-600 font-semibold animate-pulse">L'IA analyse vos données extérieures (Seuils, Météo)...</p>
                 </div>`;
             
             try {
-                // 2. Appel API
                 const response = await fetch('/analyze_peaks', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -182,26 +181,23 @@
                 });
                 const data = await response.json();
 
-                // Gestion d'erreur serveur
                 if(data.error) {
-                     analysisResults.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded" role="alert"><p class="font-bold">Erreur</p><p>${data.error}</p></div>`;
+                     analysisResults.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded"><p>${data.error}</p></div>`;
                      return;
                 }
                 
                 let html = '';
 
-                // --- 3. BLOC ENCYCLOPÉDIE (Seulement si info disponible) ---
+                // Encyclopédie
                 if (data.knowledge && data.knowledge.desc && data.knowledge.desc !== "Aucune définition encyclopédique disponible pour cette variable.") {
                     html += `
                         <div class="bg-white text-gray-800 rounded-[1.5rem] shadow-lg overflow-hidden border border-gray-100 mb-8 relative">
                             <div class="absolute top-0 left-0 w-2 h-full bg-blue-600"></div>
                             <div class="p-6 md:p-8">
                                 <h3 class="text-2xl font-bold text-blue-800 mb-4 flex items-center">
-                                    <span class="bg-blue-100 p-2 rounded-lg mr-3 text-2xl">📚</span> 
-                                    Comprendre : ${data.pollutant}
+                                    <span class="bg-blue-100 p-2 rounded-lg mr-3 text-2xl">📚</span> Comprendre : ${data.pollutant}
                                 </h3>
                                 <p class="text-gray-700 text-lg mb-6 leading-relaxed">${data.knowledge.desc}</p>
-                                
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="bg-red-50 p-5 rounded-xl border border-red-100">
                                         <span class="font-bold text-red-600 block mb-2 text-sm uppercase tracking-wider">▲ Facteurs de Hausse</span> 
@@ -213,65 +209,43 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                } else {
-                    // Message si pas d'info encyclopédique
-                    html += `
-                        <div class="bg-gray-100 p-4 rounded-xl text-center text-gray-500 mb-8 border border-gray-200">
-                            ℹ️ Aucune analyse encyclopédique disponible pour la variable <strong>${data.pollutant}</strong>.
-                            <br><span class="text-xs">L'analyse statistique reste disponible ci-dessous.</span>
-                        </div>
-                    `;
+                        </div>`;
                 }
 
-                // --- 4. BLOC VILLES / STATISTIQUES ---
+                // Statistiques par ville
                 const cities = Object.keys(data.analysis);
-                
                 if (cities.length === 0) {
-                    html += `<div class="bg-yellow-50 p-6 rounded-xl text-center text-yellow-700 border border-yellow-200">⚠️ Aucune donnée suffisante pour générer une analyse statistique.</div>`;
+                    html += `<div class="bg-yellow-50 p-6 rounded-xl text-center text-yellow-700 border border-yellow-200">⚠️ Pas assez de données.</div>`;
                 } else {
                     cities.forEach(cityName => {
                         const cityData = data.analysis[cityName];
-
                         html += `
-                        <div class="bg-white rounded-[1.5rem] shadow-xl overflow-hidden mb-10 transition-all hover:shadow-2xl border border-gray-200">
-                            
+                        <div class="bg-white rounded-[1.5rem] shadow-xl overflow-hidden mb-10 border border-gray-200">
                             <div class="bg-gray-800 p-6 text-white flex flex-col md:flex-row justify-between items-center">
-                                <div class="flex items-center gap-3 mb-4 md:mb-0">
+                                <div class="flex items-center gap-3">
                                     <span class="text-3xl">📍</span>
                                     <h4 class="text-2xl font-bold capitalize tracking-tight">${cityName}</h4>
                                 </div>
-                                
-                                <div class="flex gap-4">
-                                    <div class="flex flex-col items-center bg-gray-700 px-4 py-2 rounded-xl border border-gray-600 shadow-sm">
+                                <div class="flex gap-4 mt-4 md:mt-0">
+                                    <div class="flex flex-col items-center bg-gray-700 px-4 py-2 rounded-xl">
                                         <span class="text-gray-400 text-xs font-bold uppercase">Moyenne</span>
                                         <span class="text-lg font-mono font-bold">${cityData.stats.avg}</span>
                                     </div>
-                                    <div class="flex flex-col items-center bg-green-900/60 px-4 py-2 rounded-xl border border-green-700 shadow-sm">
-                                        <span class="text-green-300 text-xs font-bold uppercase">Min</span>
-                                        <span class="text-lg font-mono font-bold text-green-100">${cityData.stats.min}</span>
-                                    </div>
-                                    <div class="flex flex-col items-center bg-red-900/60 px-4 py-2 rounded-xl border border-red-700 shadow-sm">
+                                    <div class="flex flex-col items-center bg-red-900/60 px-4 py-2 rounded-xl">
                                         <span class="text-red-300 text-xs font-bold uppercase">Max</span>
-                                        <span class="text-lg font-mono font-bold text-red-100">${cityData.stats.max}</span>
+                                        <span class="text-lg font-mono font-bold">${cityData.stats.max}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="p-6 md:p-8 bg-gray-50 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                
-                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-red-100 relative overflow-hidden">
-                                    <div class="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
-                                    <h5 class="font-bold text-red-600 mb-6 flex items-center gap-2 text-lg">
-                                        <span class="bg-red-100 p-1.5 rounded-lg text-xl">📈</span> Pics les plus hauts
-                                    </h5>
-                                    
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-red-100">
+                                    <h5 class="font-bold text-red-600 mb-6 flex items-center gap-2 text-lg">📈 Pics les plus hauts</h5>
                                     <div class="space-y-4">
-                                        ${cityData.peaks.length > 0 ? cityData.peaks.map(p => `
-                                            <div class="flex flex-col bg-red-50/50 p-4 rounded-xl border-l-4 border-red-500 hover:bg-red-50 transition-colors">
+                                        ${cityData.peaks.map(p => `
+                                            <div class="flex flex-col bg-red-50/50 p-4 rounded-xl border-l-4 border-red-500">
                                                 <div class="flex justify-between items-center mb-2">
-                                                    <span class="text-xs font-bold text-gray-500 uppercase tracking-wide bg-white px-2 py-0.5 rounded border border-gray-200">${p.context_str}</span>
+                                                    <span class="text-xs font-bold text-gray-500 uppercase bg-white px-2 py-0.5 rounded border">${data.pollutant}</span>
                                                     <span class="font-mono text-sm text-gray-500">${p.time}</span>
                                                 </div>
                                                 <div class="flex justify-between items-end">
@@ -279,257 +253,152 @@
                                                     <span class="text-2xl font-bold text-red-600">${p.value}</span>
                                                 </div>
                                             </div>
-                                        `).join('') : '<p class="text-gray-400 text-sm italic">Aucun pic significatif détecté.</p>'}
+                                        `).join('')}
                                     </div>
                                 </div>
 
-                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-green-100 relative overflow-hidden">
-                                    <div class="absolute top-0 left-0 w-full h-1 bg-green-500"></div>
-                                    <h5 class="font-bold text-green-600 mb-6 flex items-center gap-2 text-lg">
-                                        <span class="bg-green-100 p-1.5 rounded-lg text-xl">📉</span> Creux les plus bas
-                                    </h5>
-                                    
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-green-100">
+                                    <h5 class="font-bold text-green-600 mb-6 flex items-center gap-2 text-lg">📉 Creux les plus bas</h5>
                                     <div class="space-y-4">
-                                        ${cityData.troughs.length > 0 ? cityData.troughs.map(t => `
-                                            <div class="flex items-center justify-between bg-green-50/50 p-4 rounded-xl border-l-4 border-green-500 hover:bg-green-50 transition-colors">
-                                                <div class="flex flex-col">
-                                                    <span class="font-mono text-sm text-gray-500 mb-1">📅 ${t.time}</span>
-                                                    <span class="text-xs text-green-700 font-medium">Conditions calmes / Normales</span>
+                                        ${cityData.troughs.map(t => `
+                                            <div class="flex items-center justify-between bg-green-50/50 p-4 rounded-xl border-l-4 border-green-500">
+                                                <div class="flex flex-col w-3/4">
+                                                    <span class="font-mono text-sm text-gray-400 mb-1">📅 ${t.time}</span>
+                                                    <p class="text-sm text-gray-800 leading-snug">${t.explanation}</p>
                                                 </div>
                                                 <span class="text-2xl font-bold text-green-600">${t.value}</span>
                                             </div>
-                                        `).join('') : '<p class="text-gray-400 text-sm italic">Aucun creux significatif.</p>'}
+                                        `).join('')}
                                     </div>
                                 </div>
                             </div>
                         </div>`;
                     });
                 }
-                
-                // Injection et Scroll
                 analysisResults.innerHTML = html;
                 analysisResults.scrollIntoView({behavior: 'smooth', block: 'start'});
-                
             } catch (e) {
                 console.error(e);
-                analysisResults.innerHTML = '<p class="text-red-500 text-center bg-red-50 p-4 rounded-xl">Erreur technique lors de l\'analyse client.</p>';
+                analysisResults.innerHTML = '<p class="text-red-500 text-center">Erreur technique.</p>';
             }
         };
 
-        // Ecouteur Bouton Analyse
         analysisBtn.addEventListener('click', runAnalysis);
 
-
         // =====================================================================
-        // 🛠️ FONCTIONS UTILITAIRES & INITIALISATION
+        // 🛠️ INITIALISATION & GRAPHES
         // =====================================================================
-
-        const normalizeString = (str) => {
-            if (!str) return '';
-            return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, ''); 
-        };
+        const normalizeString = (str) => str ? str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '') : '';
 
         const displayMessage = (msg, type) => {
-            if (type === 'success') { messageContainer.textContent = ''; } 
-            else { 
-                messageContainer.textContent = msg; 
-                messageContainer.style.color = (type === 'error') ? '#dc2626' : '#1f2937'; 
-            }
+            messageContainer.textContent = (type === 'success') ? '' : msg;
+            messageContainer.style.color = (type === 'error') ? '#dc2626' : '#1f2937';
         };
 
-        const populateSelect = (selectElement, options, includeEmpty = false, emptyText = 'Sélectionnez...') => {
-            selectElement.innerHTML = '';
+        const populateSelect = (select, options, includeEmpty = false, emptyText = 'Sélectionnez...') => {
+            select.innerHTML = '';
             if (includeEmpty) {
-                const emptyOption = document.createElement('option');
-                emptyOption.value = ""; emptyOption.textContent = emptyText;
-                selectElement.appendChild(emptyOption);
-            }
-            options.forEach(option => {
                 const opt = document.createElement('option');
-                opt.value = option; opt.textContent = option;
-                selectElement.appendChild(opt);
+                opt.value = ""; opt.textContent = emptyText;
+                select.appendChild(opt);
+            }
+            options.forEach(o => {
+                const opt = document.createElement('option');
+                opt.value = o; opt.textContent = o;
+                select.appendChild(opt);
             });
         };
 
-        // Chargement infos colonnes
         const fetchDataFrameInfo = async () => {
             try {
                 const response = await fetch('/get_data_info');
                 const result = await response.json();
                 if (response.ok) {
                     allColumns = result.data_info.columns;
-                    timeColumns = allColumns.filter(col => 
-                        normalizeString(col).includes('date') || normalizeString(col).includes('heure') || normalizeString(col).includes('temps')
-                    );
-                    const nonTimeColumns = allColumns.filter(col => !timeColumns.includes(col));
-                    populateSelect(yColSelect, nonTimeColumns);
-                    updateXColOptions(); updateColorColOptions();
-                } else { displayMessage(result.error, 'error'); }
-            } catch (error) { displayMessage('Erreur chargement colonnes.', 'error'); }
+                    timeColumns = allColumns.filter(col => ['date', 'heure', 'temps'].some(k => normalizeString(col).includes(k)));
+                    populateSelect(yColSelect, allColumns.filter(c => !timeColumns.includes(c)));
+                    updateXColOptions();
+                }
+            } catch (e) {}
         };
 
-        // Chargement villes
-        const fetchUniqueCities = async () => {
-            try {
-                const response = await fetch('/get_unique_cities');
-                const result = await response.json();
-                if (response.ok && result.cities) { populateSelect(cityFilterSelect, result.cities, true, 'Toutes les villes'); } 
-                else { document.getElementById('city-filter-container').style.display = 'none'; }
-            } catch (error) { document.getElementById('city-filter-container').style.display = 'none'; }
-        };
-
-        // Mise à jour options Axe X
         const updateXColOptions = () => {
             const plotType = plotTypeSelect.value;
-            const xColContainer = document.getElementById('x-col-container');
             const isTimeSeries = ['line', 'bar'].includes(plotType);
-            xColSelect.innerHTML = ''; xColSelect.disabled = false;
-            
-            if (isTimeSeries) {
-                if (timeColumns.length > 0) {
-                    const timeColName = timeColumns[0];
-                    populateSelect(xColSelect, [timeColName], false, timeColName);
-                    xColSelect.disabled = true; 
-                } else { populateSelect(xColSelect, ['Date/Heure non trouvée']); xColSelect.disabled = true; }
+            xColSelect.disabled = false;
+            if (isTimeSeries && timeColumns.length > 0) {
+                populateSelect(xColSelect, [timeColumns[0]]);
+                xColSelect.disabled = true;
             } else {
-                const nonTimeColumns = allColumns.filter(col => !timeColumns.includes(col));
-                if (['pie', 'box', 'scatter'].includes(plotType)) { populateSelect(xColSelect, nonTimeColumns); } 
-                else { populateSelect(xColSelect, allColumns); }
+                populateSelect(xColSelect, allColumns.filter(c => !timeColumns.includes(c)));
             }
             updateColorColOptions();
         };
-        
-        // Mise à jour options Couleur
-        const updateColorColOptions = () => {
-            const plotType = plotTypeSelect.value;
-            const xCol = xColSelect.value;
-            const yCol = yColSelect.value;
-            const options = [{ value: "", text: "Aucun" }];
-            const isTimeSeriesPlot = ['line'].includes(plotType); 
-            
-            if (xCol && xCol !== 'Date/Heure non trouvée' && !isTimeSeriesPlot && !timeColumns.includes(xCol)) {
-                options.push({ value: xCol, text: xCol });
-            }
-            if (['scatter', 'bar', 'pie'].includes(plotType) && yCol && yCol !== xCol && !timeColumns.includes(yCol)) {
-                options.push({ value: yCol, text: yCol });
-            }
-            if (['pie', 'box', 'distribution_histogram'].includes(plotType) && xCol && xCol !== 'Date/Heure non trouvée' && !timeColumns.includes(xCol)) {
-                if (!options.some(opt => opt.value === xCol)) options.push({ value: xCol, text: xCol });
-            }
 
-            colorColSelect.innerHTML = '';
-            options.forEach(opt => {
-                const el = document.createElement('option');
-                el.value = opt.value; el.textContent = opt.text;
-                colorColSelect.appendChild(el);
-            });
+        const updateColorColOptions = () => {
+            const opts = ["", ...allColumns.filter(c => !timeColumns.includes(c))];
+            populateSelect(colorColSelect, opts, false, "Aucun");
             updateColorTypeOptions();
         };
 
-        // Gestion affichage champs selon type graph
-        const togglePlotOptions = () => {
-            const plotType = plotTypeSelect.value;
-            updateXColOptions();
-            document.getElementById('y-col-container').style.display = ['pie', 'box', 'distribution_histogram'].includes(plotType) ? 'none' : 'block';
-            const hideColor = ['distribution_histogram', 'box', 'line'].includes(plotType);
-            document.getElementById('color-col-container').style.display = hideColor ? 'none' : 'block';
-            document.getElementById('color-type-container').style.display = hideColor ? 'none' : 'block';
-            updateColorColOptions();
-        };
-
-        // Mise à jour auto catégorie couleur
         const updateColorTypeOptions = () => {
-            const selectedCol = colorColSelect.value;
-            colorTypeSelect.innerHTML = '';
-            const emptyOption = document.createElement('option');
-            emptyOption.value = "none"; emptyOption.textContent = "Aucun"; 
-            colorTypeSelect.appendChild(emptyOption);
-
-            if (selectedCol) {
-                const normalizedCol = normalizeString(selectedCol);
-                const colKey = Object.keys(columnTypeMapping).find(key => normalizedCol.includes(key));
-                if (colKey) {
-                    const mappedType = columnTypeMapping[colKey];
+            const col = normalizeString(colorColSelect.value);
+            colorTypeSelect.innerHTML = '<option value="none">Aucun</option>';
+            Object.keys(columnTypeMapping).forEach(key => {
+                if(col.includes(key)) {
                     const opt = document.createElement('option');
-                    opt.value = mappedType.value; opt.textContent = mappedType.text;
+                    opt.value = columnTypeMapping[key].value;
+                    opt.textContent = columnTypeMapping[key].text;
                     colorTypeSelect.appendChild(opt);
-                    colorTypeSelect.value = mappedType.value;
+                    colorTypeSelect.value = opt.value;
                 }
-            } else { colorTypeSelect.value = "none"; }
+            });
         };
 
-        // =====================================================================
-        // 🚀 SOUMISSION FORMULAIRE & GÉNÉRATION GRAPHIQUE
-        // =====================================================================
         plotForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const payload = {
+                plotType: plotTypeSelect.value,
+                xCol: xColSelect.value,
+                yCol: yColSelect.value,
+                colorCol: colorColSelect.value,
+                colorType: colorTypeSelect.value,
+                city: cityFilterSelect.value
+            };
+            
             document.getElementById('plot-card').classList.remove('hidden');
-            analysisBtnContainer.classList.add('hidden'); 
-            analysisResults.classList.add('hidden'); 
-            
-            const plotType = plotTypeSelect.value;
-            const xCol = xColSelect.value;
-            const plotsWithoutColorGrouping = ['distribution_histogram', 'box', 'line'];
-            const yCol = ['pie', 'box', 'distribution_histogram'].includes(plotType) ? "" : yColSelect.value;
-            const colorCol = plotsWithoutColorGrouping.includes(plotType) ? "" : colorColSelect.value;
-            const colorType = plotsWithoutColorGrouping.includes(plotType) ? "none" : colorTypeSelect.value;
-            const city = cityFilterSelect.value;
-            
-            if (!xCol || xCol === 'Date/Heure non trouvée') { displayMessage('Sélectionnez un axe X valide.', 'error'); return; }
-            if (['scatter', 'bar', 'line'].includes(plotType) && !yCol) { displayMessage('Sélectionnez un axe Y.', 'error'); return; }
-
-            displayMessage('Génération du graphique...', 'info');
+            analysisBtnContainer.classList.add('hidden');
+            displayMessage('Génération...', 'info');
 
             try {
-                const response = await fetch('/generate_plot', {
+                const res = await fetch('/generate_plot', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plotType, xCol, yCol, colorCol, colorType, city }),
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
                 });
-                const result = await response.json();
-                
-                if (response.ok) {
-                    const plotData = JSON.parse(result.plot_json);
-                    
-                    // --- CONFIG PLOTLY (Barre de zoom masquée) ---
-                    const config = {
-                        responsive: true,
-                        displayModeBar: false, 
-                        scrollZoom: true
-                    };
-
-                    Plotly.newPlot('plot-container', plotData.data, plotData.layout, config);
-                    displayMessage('', 'success'); 
+                const data = await res.json();
+                if (res.ok) {
+                    Plotly.newPlot('plot-container', JSON.parse(data.plot_json).data, JSON.parse(data.plot_json).layout, {responsive: true, displayModeBar: false});
+                    displayMessage('', 'success');
                     redirectBtnContainer.classList.remove('hidden');
-
-                    if (yCol) {
-                        currentPollutant = yCol; 
-                        analysisBtnContainer.classList.remove('hidden');
-                    }
-                } else {
-                    displayMessage(result.error, 'error');
-                    plotContainer.innerHTML = '<p class="text-gray-500">Erreur de génération.</p>';
+                    if (payload.yCol) { currentPollutant = payload.yCol; analysisBtnContainer.classList.remove('hidden'); }
                 }
-            } catch (error) { displayMessage('Erreur inattendue.', 'error'); }
+            } catch (e) {}
         });
 
-        // Téléchargement Image
-        downloadPlotBtn.addEventListener('click', () => {
-            Plotly.downloadImage('plot-container', { format: 'png', filename: 'graphique_eurosmart' });
-        });
+        const fetchUniqueCities = async () => {
+            try {
+                const res = await fetch('/get_unique_cities');
+                const data = await res.json();
+                if (res.ok && data.cities) populateSelect(cityFilterSelect, data.cities, true, 'Toutes les villes');
+            } catch (e) {}
+        };
 
-        // Init
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchDataFrameInfo();
-            fetchUniqueCities();
-            togglePlotOptions();
-        });
-
-        // Listeners
-        plotTypeSelect.addEventListener('change', togglePlotOptions);
-        xColSelect.addEventListener('change', updateColorColOptions);
-        yColSelect.addEventListener('change', updateColorColOptions);
+        document.addEventListener('DOMContentLoaded', () => { fetchDataFrameInfo(); fetchUniqueCities(); });
+        plotTypeSelect.addEventListener('change', updateXColOptions);
         colorColSelect.addEventListener('change', updateColorTypeOptions);
+        downloadPlotBtn.addEventListener('click', () => Plotly.downloadImage('plot-container', {format: 'png', filename: 'export'}));
+
     </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 import pandas as pd
 import requests
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, send_file
 import os
 import plotly.express as px
 from sklearn.linear_model import LinearRegression
@@ -18,7 +18,7 @@ from datetime import datetime
 from meteostat import Point, Hourly
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
-
+import io
 import time
 
 
@@ -332,6 +332,7 @@ def get_city_from_coordinates(lat, lon):
 # ==============================================================================
 # 📥 ROUTE D'UPLOAD
 # ==============================================================================
+# Route pour afficher la page de chargement (upload_data.html)
 @app.route('/upload-data')
 def upload_data():
     return render_template('upload_data.html')
@@ -341,9 +342,22 @@ def upload_files():
     # 1. Récupération des entrées
     codes_input = request.form.get('code_exp')
     manual_city_fallback = request.form.get('city_exp', '').strip()
+    username = request.form.get('username')
+    password = request.form.get('password')
     
-    if not codes_input:
-        return jsonify({'error': 'Veuillez entrer au moins un code expérience.'}), 400
+    # Récupération des fichiers locaux
+    uploaded_files = request.files.getlist('local_files')
+
+    # Vérifications
+    has_codes = codes_input and codes_input.strip()
+    has_files = len(uploaded_files) > 0 and uploaded_files[0].filename != ''
+
+    if not has_codes and not has_files:
+        return jsonify({'error': 'Veuillez entrer un code expérience OU sélectionner un fichier local.'}), 400
+    
+    # Si on a des codes, on exige les identifiants
+    if has_codes and (not username or not password):
+        return jsonify({'error': 'Identifiant et mot de passe requis pour le téléchargement distant.'}), 400
         
     delimiter = ';'    
     decimal = ','
@@ -358,145 +372,229 @@ def upload_files():
         '_IQA': 'IQA', '_CO2': 'CO2', '_NOX': 'NOX', '_PA': 'Pression', 'Villes' : 'city' 
     }
 
-    # --- ÉTAPE 1 : RÉCUPÉRER LA LISTE API ---
-    api_experiments = []
-    try:
-        url = "https://polluguard.eurosmart.fr/get_experiments"
-        token = "IUFNIFN-9z84fSION@soi-efgzerg"
-        headers = {"Authorization": f"Bearer {token}"}
-        response = requests.get(url, headers=headers, timeout=5) # Timeout augmenté à 5s
-        if response.status_code == 200:
-            api_experiments = response.json()
-    except Exception as e:
-        app.logger.warning(f"API Eurosmart warning: {e}")
-
-    # --- ÉTAPE 2 : TRAITEMENT DES CODES ---
-    normalized_input = codes_input.replace(';', ',').replace(' ', ',')
-    code_list = [c.strip() for c in normalized_input.split(',') if c.strip()]
-
-    for i, code in enumerate(code_list):
-        
-        if i > 0:
-            time.sleep(1.5) 
-
-        try:
-            # A. Téléchargement
-            csv_url = f'https://version.eurosmart.fr/exp/polluguard_exp_{code}.csv'
+    # ==============================================================================
+    # PARTIE A : TRAITEMENT DES FICHIERS LOCAUX
+    # ==============================================================================
+    if has_files:
+        for file in uploaded_files:
+            if file.filename == '': continue
             
             try:
-                # low_memory=False aide pour les gros fichiers
-                df_temp = pd.read_csv(csv_url, sep=delimiter, decimal=decimal, 
-                                    storage_options={'User-Agent': 'Mozilla/5.0'},
-                                    low_memory=False)
-            except Exception:
-                errors_log.append(f"{code}: Fichier introuvable ou erreur réseau.")
-                continue
-            
-            if df_temp.empty:
-                 errors_log.append(f"{code}: Fichier vide.")
-                 continue
-
-            # B. Détection Ville
-            city_name = "Inconnu"
-            
-            # 1. Via API + Géolocalisation
-            exp_info = next((item for item in api_experiments if item.get("CodeExp") == code), None)
-            
-            if exp_info and 'Latitude' in exp_info and 'Longitude' in exp_info:
-                # Appel sécurisé à votre fonction get_city_from_coordinates
-                try:
-                    detected_city = get_city_from_coordinates(exp_info['Latitude'], exp_info['Longitude'])
-                    if detected_city:
-                        city_name = detected_city
-                except Exception as e:
-                    app.logger.error(f"Erreur Geocoding pour {code}: {e}")
-            
-            # 2. Via le nom du code
-            if city_name == "Inconnu" and '_' in code:
-                parts = code.split('_')
-                # Vérifie que la première partie ressemble à une ville (lettres, >2 chars)
-                if len(parts[0]) > 2 and not parts[0].isdigit():
-                    city_name = parts[0].capitalize()
-            
-            # 3. Via saisie manuelle (seulement si on traite un seul code ou si c'est le seul moyen)
-            if city_name == "Inconnu" and manual_city_fallback:
-                city_name = manual_city_fallback
-            
-            # 4. Fallback final
-            if city_name == "Inconnu":
-                city_name = f"Exp_{code}"
-
-            # C. Nettoyage
-            df_temp.columns = df_temp.columns.astype(str)
-            df_temp.columns = df_temp.columns.str.strip().str.replace(' ', '')
-
-            rename_dict = {}
-            for original, new in column_mapping.items():
-                for col in df_temp.columns:
-                    if original.lower() in col.lower() and col not in rename_dict.values():
-                        rename_dict[col] = new
-                        break
-            if rename_dict: df_temp.rename(columns=rename_dict, inplace=True)
-            
-            # Suppression colonnes inutiles
-            cols_to_drop = []
-            time_col_found = False
-            for col in df_temp.columns:
-                if 'batterie' in col.lower(): cols_to_drop.append(col)
-                elif 'temps' in col.lower():
-                    if not time_col_found:
-                        time_col_found = True
-                        df_temp.rename(columns={col: 'temps'}, inplace=True)
-                    else: cols_to_drop.append(col)
-            if cols_to_drop: df_temp = df_temp.drop(columns=cols_to_drop, errors='ignore')
+                # Lecture directe
+                df_temp = pd.read_csv(file, sep=delimiter, decimal=decimal, low_memory=False)
                 
-            # Date
-            df_temp, time_col = convert_to_datetime(df_temp)
-            if time_col: session['time_col'] = time_col
-            
-            # Ajout Méta
-            df_temp['city'] = city_name
-           
-            
-            # Remplissage NaN
-            for col in df_temp.columns:
-                if pd.api.types.is_numeric_dtype(df_temp[col]):
-                    df_temp[col].fillna(df_temp[col].median(), inplace=True)
+                if df_temp.empty:
+                    errors_log.append(f"Fichier local {file.filename}: Vide.")
+                    continue
 
-            file_info_list.append({'filename': code, 'city': city_name})
-            
-            # Concaténation
-            all_data = pd.concat([all_data, df_temp], ignore_index=True)
+                # Détection Ville via le nom du fichier
+                city_name = "Inconnu"
+                filename_clean = os.path.splitext(file.filename)[0]
+                
+                if '_' in filename_clean:
+                    parts = filename_clean.split('_')
+                    if len(parts[0]) > 2: city_name = parts[0].capitalize()
+                elif '-' in filename_clean:
+                    parts = filename_clean.split('-')
+                    if len(parts[0]) > 2: city_name = parts[0].capitalize()
+                else:
+                    if len(filename_clean) > 2 and not filename_clean.isdigit():
+                        city_name = filename_clean.capitalize()
 
+                # --- BLOC NETTOYAGE (Commun) ---
+                df_temp.columns = df_temp.columns.astype(str).str.strip().str.replace(' ', '')
+
+                rename_dict = {}
+                for original, new in column_mapping.items():
+                    for col in df_temp.columns:
+                        if original.lower() in col.lower() and col not in rename_dict.values():
+                            rename_dict[col] = new
+                            break
+                if rename_dict: df_temp.rename(columns=rename_dict, inplace=True)
+                
+                cols_to_drop = []
+                time_col_found = False
+                for col in df_temp.columns:
+                    if 'batterie' in col.lower(): cols_to_drop.append(col)
+                    elif 'temps' in col.lower():
+                        if not time_col_found:
+                            time_col_found = True
+                            df_temp.rename(columns={col: 'temps'}, inplace=True)
+                        else: cols_to_drop.append(col)
+                if cols_to_drop: df_temp = df_temp.drop(columns=cols_to_drop, errors='ignore')
+                    
+                df_temp, time_col = convert_to_datetime(df_temp)
+                if time_col: session['time_col'] = time_col
+                
+                df_temp['city'] = city_name
+            
+                for col in df_temp.columns:
+                    if pd.api.types.is_numeric_dtype(df_temp[col]):
+                        df_temp[col].fillna(df_temp[col].median(), inplace=True)
+                
+                file_info_list.append({'filename': file.filename, 'city': city_name})
+                all_data = pd.concat([all_data, df_temp], ignore_index=True)
+
+            except Exception as e:
+                app.logger.error(f"Erreur fichier local {file.filename}: {e}")
+                errors_log.append(f"{file.filename}: Erreur lecture.")
+
+    # ==============================================================================
+    # PARTIE B : TRAITEMENT DISTANT (CODES) - CORRIGÉE
+    # ==============================================================================
+    if has_codes:
+        # --- 1. CONFIGURATION SESSION ROBUSTE ---
+        session_requests = requests.Session()
+        
+        # HEADERS : On imite un navigateur pour éviter l'erreur 401
+        headers_browser = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://polluguard.eurosmart.fr/',
+            'Accept': 'application/json, text/plain, */*'
+        }
+        session_requests.headers.update(headers_browser)
+
+        # --- 2. LOGIN ---
+        try:
+            login_url = "https://polluguard.eurosmart.fr/api/login"
+            login_payload = {"username": username, "password": password}
+            
+            # Timeout court pour le login
+            login_response = session_requests.post(login_url, json=login_payload, timeout=15)
+            
+            if login_response.status_code != 200:
+                app.logger.error(f"Login Failed: {login_response.status_code} - {login_response.text}")
+                if not has_files:
+                    return jsonify({'error': 'Connexion refusée par Eurosmart. Vérifiez vos identifiants.'}), 401
+                else:
+                    errors_log.append("Connexion distante refusée (Identifiants incorrects).")
+                    has_codes = False # On continue seulement avec les fichiers locaux
         except Exception as e:
-            app.logger.error(f"CRASH sur le code {code}: {e}")
-            errors_log.append(f"{code}: Erreur interne ({str(e)}).")
-            
-    # --- 4. RETOUR ---
+            app.logger.error(f"Login Exception: {e}")
+            if not has_files:
+                return jsonify({'error': f"Erreur serveur : {str(e)}"}), 500
+            errors_log.append("Erreur technique connexion distante.")
+            has_codes = False
+
+        # --- 3. TÉLÉCHARGEMENT ---
+        if has_codes:
+            # Récupération Métadonnées (Géo)
+            api_experiments = []
+            try:
+                url_meta = "https://polluguard.eurosmart.fr/get_experiments"
+                resp_meta = session_requests.get(url_meta, timeout=10)
+                if resp_meta.status_code == 200:
+                    api_experiments = resp_meta.json()
+            except Exception as e:
+                app.logger.warning(f"Warning API Meta: {e}")
+
+            # Boucle sur les codes
+            normalized_input = codes_input.replace(';', ',').replace(' ', ',')
+            code_list = [c.strip() for c in normalized_input.split(',') if c.strip()]
+
+            for i, code in enumerate(code_list):
+                if i > 0: time.sleep(1) # Pause de courtoisie
+
+                try:
+                    download_url = "https://polluguard.eurosmart.fr/secure_download"
+                    params = {'codeExp': code}
+                    
+                    # TIMEOUT AUGMENTÉ à 120s pour éviter "Erreur réseau" sur les gros fichiers
+                    file_response = session_requests.get(download_url, params=params, timeout=120)
+                    
+                    if file_response.status_code == 200:
+                        # Vérif anti-page d'erreur HTML
+                        if 'text/html' in file_response.headers.get('Content-Type', ''):
+                            errors_log.append(f"{code}: Erreur droits (HTML reçu).")
+                            continue
+
+                        csv_content = io.StringIO(file_response.text)
+                        df_temp = pd.read_csv(csv_content, sep=delimiter, decimal=decimal, low_memory=False)
+                    
+                    elif file_response.status_code == 401:
+                        errors_log.append(f"{code}: Session expirée (401).")
+                        continue
+                    elif file_response.status_code == 404:
+                        errors_log.append(f"{code}: Introuvable.")
+                        continue
+                    else:
+                        errors_log.append(f"{code}: Erreur HTTP {file_response.status_code}")
+                        continue
+                    
+                    if df_temp.empty:
+                        errors_log.append(f"{code}: Fichier vide.")
+                        continue
+
+                    # Détection Ville
+                    city_name = "Inconnu"
+                    exp_info = next((item for item in api_experiments if item.get("CodeExp") == code), None)
+                    if exp_info and 'Latitude' in exp_info:
+                        try:
+                            detected_city = get_city_from_coordinates(exp_info['Latitude'], exp_info['Longitude'])
+                            if detected_city: city_name = detected_city
+                        except: pass
+                    
+                    if city_name == "Inconnu" and '_' in code:
+                        parts = code.split('_')
+                        if len(parts[0]) > 2 and not parts[0].isdigit(): city_name = parts[0].capitalize()
+                    
+                    if city_name == "Inconnu" and manual_city_fallback: city_name = manual_city_fallback
+                    if city_name == "Inconnu": city_name = f"Exp_{code}"
+
+                    # --- BLOC NETTOYAGE (Identique) ---
+                    df_temp.columns = df_temp.columns.astype(str).str.strip().str.replace(' ', '')
+                    rename_dict = {}
+                    for original, new in column_mapping.items():
+                        for col in df_temp.columns:
+                            if original.lower() in col.lower() and col not in rename_dict.values():
+                                rename_dict[col] = new
+                                break
+                    if rename_dict: df_temp.rename(columns=rename_dict, inplace=True)
+                    
+                    cols_to_drop = []
+                    time_col_found = False
+                    for col in df_temp.columns:
+                        if 'batterie' in col.lower(): cols_to_drop.append(col)
+                        elif 'temps' in col.lower():
+                            if not time_col_found:
+                                time_col_found = True
+                                df_temp.rename(columns={col: 'temps'}, inplace=True)
+                            else: cols_to_drop.append(col)
+                    if cols_to_drop: df_temp = df_temp.drop(columns=cols_to_drop, errors='ignore')
+                        
+                    df_temp, time_col = convert_to_datetime(df_temp)
+                    if time_col: session['time_col'] = time_col
+                    
+                    df_temp['city'] = city_name
+                    for col in df_temp.columns:
+                        if pd.api.types.is_numeric_dtype(df_temp[col]):
+                            df_temp[col].fillna(df_temp[col].median(), inplace=True)
+                    
+                    file_info_list.append({'filename': code, 'city': city_name})
+                    all_data = pd.concat([all_data, df_temp], ignore_index=True)
+
+                except Exception as e:
+                    app.logger.error(f"CRASH code {code}: {e}")
+                    errors_log.append(f"{code}: Erreur technique.")
+
+    # --- 4. RETOUR FINAL ---
     if all_data.empty:  
-        msg = "Échec du chargement."
+        msg = "Échec du chargement. Aucune donnée récupérée."
         if errors_log: msg += " Détails : " + " | ".join(errors_log)
         return jsonify({'error': msg}), 400
             
-    # Sauvegarde Parquet (Inchangé)
+    # Sauvegarde Parquet
     data_filename = f'{uuid.uuid4()}.parquet'
     file_path = os.path.join(app.config['DATA_FOLDER'], data_filename)
     all_data.to_parquet(file_path)
     session['data_file'] = data_filename
     
-    # --- MODIFICATION ICI : APERÇU INTELLIGENT ---
-    # Au lieu de prendre juste les 5 premières lignes totales (head()),
-    # on prend les 5 premières lignes de CHAQUE ville présente dans le fichier.
-    
+    # Aperçu Intelligent
     try:
-        # On groupe par 'city', on prend les 5 premiers de chaque, et on reset l'index pour l'affichage
         preview_df = all_data.groupby('city', sort=False).head(5).reset_index(drop=True)
-        
-        # Génération du HTML sans l'index (plus propre)
         preview_html = preview_df.to_html(classes='data-table table-striped table-bordered', index=False)
     except Exception as e:
-        # Fallback au cas où (si la colonne city n'existe pas pour une raison obscure)
-        app.logger.error(f"Erreur lors de l'aperçu groupé: {e}")
+        app.logger.error(f"Erreur aperçu: {e}")
         preview_html = all_data.head(10).to_html(classes='data-table table-striped table-bordered')
 
     info = {        
@@ -509,7 +607,34 @@ def upload_files():
     msg = 'Données chargées avec succès.'
     if errors_log: msg += " (Attention: " + ", ".join(errors_log) + ")"
     
-    return jsonify({'message': msg, 'data_info': info, 'preview': preview_html})       
+    return jsonify({'message': msg, 'data_info': info, 'preview': preview_html})
+
+@app.route('/download_data')
+def download_data():
+    """
+    Permet de télécharger les données actuelles (chargées en session) sous format CSV.
+    """
+    df = get_df_from_session()
+    if df is None:
+        return "Aucune donnée disponible. Veuillez d'abord charger des fichiers.", 404
+    
+    try:
+        # Création d'un buffer mémoire
+        buffer = io.BytesIO()
+        
+        # Export en CSV (Format Excel Français : séparateur point-virgule, encodage utf-8-sig)
+        df.to_csv(buffer, index=False, sep=';', decimal=',', encoding='utf-8-sig')
+        buffer.seek(0)
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name='donnees_eurosmart_completes.csv',
+            mimetype='text/csv'
+        )
+    except Exception as e:
+        app.logger.error(f"Erreur lors du téléchargement : {e}")
+        return f"Erreur serveur : {e}", 500  
 # ==============================================================================
 # 🎨 PAGE NETOYAGE
 # ==============================================================================            
@@ -811,6 +936,41 @@ def generate_plot():
 # ==============================================================================
 # 🎨 PAGE PREDICTION
 # ==============================================================================
+
+import pandas as pd
+import numpy as np
+import requests
+import io
+import os
+import time
+import uuid
+import math
+import re
+import glob
+from datetime import timedelta, datetime
+from flask import Flask, render_template, request, jsonify, session, send_file
+import plotly.express as px
+import plotly.graph_objects as go
+import joblib
+
+# --- IMPORTS ML AVANCÉS ---
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.linear_model import LinearRegression, ElasticNet
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+
+# Gestion des librairies optionnelles (si non installées)
+try:
+    from xgboost import XGBRegressor
+except ImportError: XGBRegressor = None
+try:
+    from lightgbm import LGBMRegressor
+except ImportError: LGBMRegressor = None
+try:
+    from catboost import CatBoostRegressor
+except ImportError: CatBoostRegressor = None
+
 @app.route('/prediction-modeling')
 def prediction_modeling():
     return render_template('prediction_modeling.html')
@@ -859,8 +1019,9 @@ def get_data_columns():
     numeric_cols = [col for col in df.columns if pd.api.types.is_numeric_dtype(df[col])]
     return jsonify({'columns': numeric_cols})
 
-
-
+# ==============================================================================
+# 🧠 MOTEUR DE PRÉDICTION AVANCÉ (ROUTE MISE À JOUR)
+# ==============================================================================
 @app.route('/train_predict', methods=['POST'])
 def train_predict():
     df = get_df_from_session()
@@ -868,109 +1029,99 @@ def train_predict():
         return jsonify({'error': 'Aucune donnée chargée en session.'}), 400
 
     time_col = session.get('time_col')
-    if not time_col or time_col not in df.columns or not pd.api.types.is_datetime64_any_dtype(df[time_col]):
-        return jsonify({'error': 'Colonne de temps introuvable ou de format incorrect.'}), 400
+    if not time_col or time_col not in df.columns:
+        return jsonify({'error': 'Colonne de temps introuvable.'}), 400
 
-    # Gérer les NaT dans la colonne de temps
+    # Nettoyage Temps
     df[time_col] = df[time_col].ffill().bfill()
-    if df[time_col].isna().any():
-        return jsonify({'error': 'La colonne de temps contient toujours des valeurs invalides.'}), 400
-
+    
     req_data = request.json
     target_col = req_data.get('targetCol')
     feature_cols = req_data.get('featureCols')
+    selected_model_key = req_data.get('selectedModel', 'all') # Nouveau paramètre
 
     if not target_col or not feature_cols:
-        return jsonify({'error': 'Veuillez sélectionner la variable cible et les variables explicatives.'}), 400
+        return jsonify({'error': 'Sélectionnez la cible et les variables.'}), 400
 
-    # Vérification des colonnes
-    for col in [target_col] + feature_cols:
-        if col not in df.columns:
-            return jsonify({'error': f"La colonne '{col}' est introuvable."}), 400
-            
     df = df.copy()
 
-    # ==============================================================================
-    # TRAITEMENT DES VALEURS ABERRANTES (OUTLIERS) - IQR
-    # ==============================================================================
-    cols_to_process = [target_col] + feature_cols
-    for col in cols_to_process:
+    # 1. OUTLIERS (IQR)
+    for col in [target_col] + feature_cols:
         if pd.api.types.is_numeric_dtype(df[col]):
             Q1 = df[col].quantile(0.25)
             Q3 = df[col].quantile(0.75)
             IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            median_value = df[col].median()
-            
-            outlier_indexes = df[(df[col] < lower_bound) | (df[col] > upper_bound)].index
-            if not outlier_indexes.empty:
-                df.loc[outlier_indexes, col] = median_value
+            lower = Q1 - 1.5 * IQR
+            upper = Q3 + 1.5 * IQR
+            median_val = df[col].median()
+            df.loc[(df[col] < lower) | (df[col] > upper), col] = median_val
 
-    # ==============================================================================
-    # INGÉNIERIE DES FONCTIONNALITÉS (FEATURE ENGINEERING)
-    # ==============================================================================
+    # 2. FEATURE ENGINEERING (Temporel)
     df['heure'] = df[time_col].dt.hour
     df['jour_semaine'] = df[time_col].dt.dayofweek
     df['mois'] = df[time_col].dt.month
-    df['jour'] = df[time_col].dt.day
-    df['minute'] = df[time_col].dt.minute
     
+    # Tri Chronologique IMPÉRATIF
     df.sort_values(by=time_col, inplace=True)
 
-    # Création des variables de "lag" (décalage)
+    # Création des Lags (Mémoire du passé)
+    # Pour éviter la triche, on utilise t-1 pour prédire t
     df[f'{target_col}_lag1'] = df[target_col].shift(1)
     for col in feature_cols:
         df[f'{col}_lag1'] = df[col].shift(1)
 
-    # Remplissage des NaN générés par le lag et autres manques
-    for col in df.columns:
-        if pd.api.types.is_numeric_dtype(df[col]):
-            df[col].fillna(df[col].median(), inplace=True)
+    df.dropna(inplace=True)
 
-    if df.empty:
-        return jsonify({'error': 'Jeu de données trop petit après traitement.'}), 400
+    if df.empty: return jsonify({'error': 'Données insuffisantes après traitement.'}), 400
 
-    # Liste initiale de toutes les features potentielles
-    potential_features = [f'{target_col}_lag1'] + [f'{col}_lag1' for col in feature_cols] + ['heure', 'jour_semaine', 'mois', 'jour', 'minute']
-    potential_features = [col for col in potential_features if col in df.columns]
+    # Définition des Features Finales
+    features_final = [f'{target_col}_lag1'] + [f'{col}_lag1' for col in feature_cols] + ['heure', 'jour_semaine', 'mois']
+    features_final = [c for c in features_final if c in df.columns]
 
-    # ==============================================================================
-    # SÉLECTION DES VARIABLES (SANS FILTRE DE CORRÉLATION)
-    # ==============================================================================
-    # On utilise directement toutes les features potentielles sans filtrage
-    features_final = potential_features
-
-    # Préparation X et y
     X = df[features_final]
     y = df[target_col]
 
-    # Vérification taille minimale
-    if len(df) < 2:
-        return jsonify({'error': 'Pas assez de données pour entraîner un modèle.'}), 400
-
-    # Split Train/Test (80/20)
-    split_point = int(len(df) * 0.8)
-    if split_point == 0: split_point = 1 # Sécurité pour très petits datasets
+    # SCALING (Important pour la convergence de certains modèles)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    # On garde le scaler en mémoire (idéalement faudrait le sauvegarder avec joblib)
     
-    X_train, X_test = X.iloc[:split_point], X.iloc[split_point:]
-    y_train, y_test = y.iloc[:split_point], y.iloc[split_point:]
+    # Split Chronologique (Pas de shuffle pour les séries temporelles !)
+    split = int(len(df) * 0.85)
+    X_train, X_test = X_scaled[:split], X_scaled[split:]
+    y_train, y_test = y.iloc[:split], y.iloc[split:]
 
-    if X_train.empty or X_test.empty:
-        return jsonify({'error': 'Données insuffisantes pour le split Train/Test.'}), 400
-
-    # ==============================================================================
-    # MODÉLISATION (AVEC RÉGRESSION LINÉAIRE)
-    # ==============================================================================
-    models = {
-        "Linear Regression": LinearRegression(), 
-        "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1),
-        "Gradient Boosting": GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=3, random_state=42)
+    # 3. DÉFINITION DE L'ARSENAL DE MODÈLES
+    available_models = {
+        "Linear Regression": LinearRegression(),
+        "Random Forest": RandomForestRegressor(n_estimators=100, n_jobs=-1, random_state=42),
+        "ElasticNet": ElasticNet(alpha=0.1, l1_ratio=0.5, random_state=42),
+        "Gradient Boosting": GradientBoostingRegressor(n_estimators=100, random_state=42)
     }
+    
+    # Ajout conditionnel des modèles avancés
+    if XGBRegressor:
+        available_models["XGBoost"] = XGBRegressor(n_estimators=100, verbosity=0, random_state=42)
+    if LGBMRegressor:
+        available_models["LightGBM"] = LGBMRegressor(n_estimators=100, verbosity=-1, random_state=42)
+    if CatBoostRegressor:
+        available_models["CatBoost"] = CatBoostRegressor(n_estimators=100, verbose=0, random_state=42)
+
+    # Filtrage selon le choix utilisateur
+    models_to_train = {}
+    if selected_model_key == 'all':
+        models_to_train = available_models
+    elif selected_model_key in available_models:
+        models_to_train = {selected_model_key: available_models[selected_model_key]}
+    else:
+        # Fallback
+        models_to_train = {"Linear Regression": available_models["Linear Regression"]}
 
     results = {}
+    predictions_data = {}
 
-    for name, model in models.items():
+    # 4. ENTRAÎNEMENT & SAUVEGARDE
+    for name, model in models_to_train.items():
         try:
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
@@ -978,102 +1129,87 @@ def train_predict():
             mse = mean_squared_error(y_test, y_pred)
             r2 = r2_score(y_test, y_pred)
             mae = mean_absolute_error(y_test, y_pred)
-
-            # Sauvegarde du modèle
+            
+            # Sauvegarde
             model_filename = f'modele_{name.replace(" ", "_")}.joblib'
             joblib.dump(model, os.path.join(app.config['OUTPUT_FOLDER'], model_filename))
-
-            results[name] = {
-                'mse': mse,
-                'r2': r2,
-                'mae': mae
-            }
+            
+            results[name] = {'mse': mse, 'r2': r2, 'mae': mae}
         except Exception as e:
             results[name] = {'error': str(e)}
 
-    # ==============================================================================
-    # PRÉDICTION ITÉRATIVE (FUTURE)
-    # ==============================================================================
-    def predict_next_hours(model_name, num_steps=18):
-        model_path = os.path.join(app.config['OUTPUT_FOLDER'], f'modele_{model_name.replace(" ", "_")}.joblib')
-        if not os.path.exists(model_path):
-            return []
-            
-        model = joblib.load(model_path)
+    # 5. PRÉDICTION FUTURE (BOUCLE 24H)
+    def predict_future_24h(model_name):
+        path = os.path.join(app.config['OUTPUT_FOLDER'], f'modele_{model_name.replace(" ", "_")}.joblib')
+        if not os.path.exists(path): return []
+        
+        model = joblib.load(path)
+        
+        # On part de la dernière ligne réelle connue
         last_row = df.tail(1).copy()
-        predictions = []
-        current_data = last_row.iloc[0].to_dict()
-
-        for _ in range(num_steps):
-            # Mise à jour des lags
-            current_data[f'{target_col}_lag1'] = current_data[target_col]
-            for col in feature_cols:
-                current_data[f'{col}_lag1'] = current_data[col]
+        current_data_dict = last_row.iloc[0].to_dict()
+        
+        preds = []
+        
+        # Calcul du nombre de pas pour 24h (si intervalle = 10 min, steps = 144)
+        # On tente de déduire la fréquence, sinon défaut 10 min
+        try:
+            freq_mins = (df[time_col].iloc[-1] - df[time_col].iloc[-2]).total_seconds() / 60
+            if freq_mins <= 0: freq_mins = 10
+        except:
+            freq_mins = 10
             
-            # Avance temporelle (10 minutes)
-            current_data[time_col] += timedelta(minutes=10)
+        steps_24h = int((24 * 60) / freq_mins)
+        
+        current_time = current_data_dict[time_col]
+
+        for _ in range(steps_24h):
+            # Mise à jour des Lags avec la valeur PRÉCÉDENTE (Réelle ou Prédite)
+            # C'est ici qu'on évite la triche : on utilise la prédiction t-1 pour prédire t
+            current_data_dict[f'{target_col}_lag1'] = current_data_dict[target_col]
+            for c in feature_cols:
+                # Hypothèse naïve : les autres variables restent constantes (ou on pourrait aussi les prédire)
+                # Pour plus de robustesse, on peut utiliser leurs propres moyennes glissantes
+                current_data_dict[f'{c}_lag1'] = current_data_dict[c]
+
+            # Avance temps
+            current_time += timedelta(minutes=freq_mins)
             
             # Mise à jour features temporelles
-            current_data['heure'] = current_data[time_col].hour
-            current_data['minute'] = current_data[time_col].minute
-            current_data['jour_semaine'] = current_data[time_col].dayofweek
-            current_data['jour'] = current_data[time_col].day
-            current_data['mois'] = current_data[time_col].month
+            current_data_dict['heure'] = current_time.hour
+            current_data_dict['jour_semaine'] = current_time.dayofweek
+            current_data_dict['mois'] = current_time.month
 
+            # Construction vecteur X
+            row_to_predict = pd.DataFrame([current_data_dict])[features_final]
             
-            try:
-                predict_row = pd.DataFrame([current_data])
-                # Filtrer pour ne garder que les colonnes utilisées lors de l'entraînement
-                predict_df = predict_row[features_final] 
-                
-                prediction_value = model.predict(predict_df)[0]
-                
-                predictions.append({
-                    'time': current_data[time_col].strftime('%Y-%m-%d %H:%M'),
-                    'value': prediction_value
-                })
-                
-                # Mise à jour de la cible pour la prochaine boucle
-                current_data[target_col] = prediction_value
-            except Exception as e:
-                print(f"Erreur prédiction itérative: {e}")
-                break
+            # Scaling (Important d'utiliser le même scaler)
+            row_scaled = scaler.transform(row_to_predict)
+            
+            # Prédiction
+            val_pred = model.predict(row_scaled)[0]
+            
+            preds.append({
+                'time': current_time.strftime('%Y-%m-%d %H:%M'),
+                'value': float(val_pred)
+            })
+            
+            # Mise à jour de la cible actuelle pour le prochain lag
+            current_data_dict[target_col] = val_pred
 
-        return predictions
+        return preds
 
-    # Génération des prédictions pour les 3 modèles
-    predictions_lr = predict_next_hours("Linear Regression")
-    predictions_rf = predict_next_hours("Random Forest")
-    predictions_gb = predict_next_hours("Gradient Boosting")
+    # Génération des prédictions pour tous les modèles entraînés
+    for name in results.keys():
+        if 'error' not in results[name]:
+            predictions_data[name] = predict_future_24h(name)
 
     return jsonify({
-        'message': 'Modèles entraînés et prédictions générées avec succès.',
-        'features_selected': features_final, # Info utile pour le front-end
+        'message': 'Analyse 24H terminée.',
+        'features_used': features_final,
         'results': results,
-        'predictions_lr': predictions_lr,
-        'predictions_rf': predictions_rf,
-        'predictions_gb': predictions_gb
+        'predictions': predictions_data # Structure unifiée : {'Linear Regression': [...], 'XGBoost': [...]}
     })
-@app.route('/get_comparison_columns', methods=['GET'])
-def get_comparison_columns():
-    """
-    Route pour obtenir les colonnes textuelles (pour la ville) et numériques
-    (pour les données météo) afin de peupler les menus déroulants.
-    """
-    df = get_df_from_session()
-    if df is None:
-        return jsonify({'error': 'Aucune donnée chargée en session.'}), 400
-    
-    numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
-    # On suppose que les colonnes de type 'object' ou 'category' peuvent contenir le nom de la ville
-    text_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    
-    return jsonify({
-        'numeric_columns': numeric_cols,
-        'text_columns': text_cols
-    })
-
-
 # ------------------------------------------------------------------------------
 # 1. ROUTE POUR AFFICHER LA PAGE HTML (MÉTHODE GET)
 # ------------------------------------------------------------------------------
@@ -1278,98 +1414,69 @@ def get_time_context(date):
     elif m in [3, 4, 5]: season = "Printemps"
     elif m in [6, 7, 8]: season = "Été"
     return period, season, is_weekend
+# ==============================================================================
+# 🧠 MOTEUR D'ANALYSE INTELLIGENT (VERSION FINALE SANS UNDEFINED)
+# ==============================================================================
 
-# ==============================================================================
-# 2. LOGIQUE D'ANALYSE AVANCÉE (Incluant Activités Humaines Diverses)
-# ==============================================================================
-def generate_explanation(knowledge_key, value, context):
+def generate_explanation(knowledge_key, value, context, is_peak=True):
     """
-    Génère l'explication en croisant Polluant + Valeur + Temps + Activité Humaine
+    Génère une analyse pour l'extérieur.
+    is_peak=True  -> Analyse du Maximum
+    is_peak=False -> Analyse du Minimum (Creux)
     """
-    if not knowledge_key: return "Analyse non disponible."
+    if not knowledge_key: return "Analyse des conditions ambiantes."
     
     period, season, is_weekend = context
     causes = []
     key = knowledge_key.upper()
-    
-    # --- LOGIQUE PARTICULES (PM10, PM2.5) ---
+
+    # --- LOGIQUE POUR LES CREUX (MINIMA) ---
+    if not is_peak:
+        if 'PM' in key or 'NOX' in key or 'CO2' in key:
+            causes.append("En tenant compte de la faible concentration, les causes sont probablement liées à un lessivage de l'air par la pluie ou à une dispersion efficace des polluants par des vents soutenus.")
+        elif 'TEMPERATURE' in key:
+            causes.append("En tenant compte du refroidissement, les causes sont probablement liées à l'absence d'ensoleillement et à la déperdition thermique du sol vers l'atmosphère (nuit claire).")
+        elif 'HUMIDITE' in key:
+            causes.append("En tenant compte de l'air sec, les causes sont probablement liées à l'arrivée d'une masse d'air continentale ou à un réchauffement rapide du sol qui dissipe l'humidité de surface.")
+        else:
+            causes.append("Les conditions météorologiques actuelles favorisent une stabilisation des niveaux aux valeurs les plus basses enregistrées.")
+        return f"Analyse : {', '.join(causes)}"
+
+    # --- LOGIQUE POUR LES PICS (MAXIMA) ---
     if 'PM' in key:
-        # 1. Trafic (Classique)
-        if period in ['Pointe Matin', 'Pointe Soir'] and not is_weekend: 
-            causes.append("trafic routier pendulaire")
-        
-        # 2. Chauffage (Hiver/Soir/Nuit)
-        if season in ['Hiver', 'Automne'] and period in ['Pointe Soir', 'Nuit']: 
-            causes.append("chauffage résidentiel (bois/fioul)")
-        
-        # 3. Agriculture (Printemps/Automne + Journée) -> Souvent oublié !
-        if season in ['Printemps', 'Automne'] and period == 'Journée':
-            causes.append("épandages agricoles ou labours (poussières)")
+        if period == "Pointe Matin":
+            if season == "Hiver":
+                causes.append("En tenant compte de l'inversion thermique, les causes sont probablement liées au piégeage des particules de combustion au sol par une couche d'air froid.")
+            else:
+                causes.append("En tenant compte de la reprise des flux, les causes sont probablement liées aux émissions de freinage et d'échappement du trafic routier.")
+        elif period in ["Pointe Soir", "Nuit"] and season in ["Hiver", "Automne"]:
+            causes.append("En tenant compte du froid nocturne, les causes sont probablement liées à l'intensification du chauffage résidentiel local.")
 
-        # 4. Industrie / Chantiers (Semaine + Journée)
-        if not is_weekend and period == 'Journée':
-            causes.append("activité industrielle ou chantiers BTP proches")
-            
-        # 5. Météo (Hiver + Matin)
-        if season == 'Hiver' and period == 'Pointe Matin': 
-            causes.append("inversion thermique (polluants piégés)")
-
-    # --- LOGIQUE COV (Chimie) ---
-    elif 'COV' in key or 'VOC' in key:
-        # 1. Trafic
-        if period in ['Pointe Matin', 'Pointe Soir']: 
-            causes.append("gaz d'échappement")
-        
-        # 2. Activité Domestique / Bricolage (Week-end ou Journée)
-        if (is_weekend and period == 'Journée') or (period == 'Journée'):
-            causes.append("usage de solvants, peintures ou produits ménagers")
-            
-        # 3. Industrie (Semaine)
-        if not is_weekend and period == 'Journée':
-            causes.append("émissions industrielles (usines, pressings)")
-
-        # 4. Naturel (Été)
-        if season == 'Été' and period == 'Journée': 
-            causes.append("évaporation thermique (végétation/carburants)")
-
-    # --- LOGIQUE CO2 (Confinement) ---
     elif 'CO2' in key:
-        # 1. Occupation Humaine
-        if value > 1000:
-            causes.append("forte occupation humaine (réunions, classe, foule)")
-        
-        # 2. Manque d'aération
-        if season == 'Hiver': 
-            causes.append("confinement (fenêtres fermées pour chauffer)")
-            
-        # 3. Combustion interne
-        if value > 600 and period == 'Journée':
-             causes.append("respiration ou cuisine (si capteur intérieur)")
+        if period in ["Pointe Matin", "Pointe Soir"]:
+            causes.append("En tenant compte du trafic, les causes sont probablement liées à la concentration des rejets de combustion des moteurs thermiques en zone urbaine.")
+        elif period == "Nuit":
+            causes.append("En tenant compte du cycle végétal, les causes sont probablement liées à la respiration nocturne des plantes rejetant du CO2 en l'absence de photosynthèse.")
 
-    # --- LOGIQUE NOX (Industrie/Route) ---
-    elif 'NOX' in key:
-        if period in ['Pointe Matin', 'Pointe Soir']:
-            causes.append("trafic routier (véhicules diesel)")
-        if not is_weekend and period == 'Journée':
-            causes.append("activités industrielles ou logistiques (camions)")
-
-    # --- LOGIQUE TEMPÉRATURE ---
     elif 'TEMPERATURE' in key:
-        if value < 0: causes.append("gel hivernal")
-        elif value > 30: causes.append("canicule")
-        elif period == 'Journée': causes.append("ensoleillement")
-        elif period == 'Nuit': causes.append("refroidissement nocturne")
+        if period == "Journée":
+            causes.append("En tenant compte de l'albédo, les causes sont probablement liées au rayonnement solaire direct et à l'accumulation de chaleur sur les surfaces minérales.")
+        else:
+            causes.append("En tenant compte du contexte temporel, les causes sont probablement liées à une stagnation d'une masse d'air chaud ou à une inertie thermique locale.")
 
-    # --- LOGIQUE HUMIDITÉ ---
     elif 'HUMIDITE' in key:
-        if value > 90: causes.append("temps pluvieux ou brouillard")
-        elif period == 'Nuit' and value > 70: causes.append("rosée nocturne")
-        elif period == 'Journée' and value < 40: causes.append("air sec / chauffage actif")
+        if season == "Hiver" and period == "Pointe Matin" and value > 85:
+            causes.append("En tenant compte du froid matinal, les causes sont probablement liées à la saturation de l'air atteignant son point de rosée (formation de brouillard ou givre).")
+        elif season == "Été" and value > 70:
+            causes.append("En tenant compte de la chaleur, les causes sont probablement liées à une forte évapotranspiration ou à une instabilité pré-orageuse.")
+        elif value > 85:
+            causes.append("En tenant compte du taux élevé, les causes sont probablement liées à des précipitations récentes ou à un refroidissement rapide de l'air ambiant.")
 
-    if not causes: 
-        return "Source locale indéterminée ou pollution de fond."
+    if not causes:
+        return "Analyse : Fluctuations normales liées aux cycles météorologiques extérieurs."
+    
+    return f"Analyse : {', '.join(causes)}"
 
-    return f"Facteurs possibles : {', '.join(causes)}."
 @app.route('/analyze_peaks', methods=['POST'])
 def analyze_peaks():
     try:
@@ -1377,97 +1484,68 @@ def analyze_peaks():
         if df is None: return jsonify({'error': 'Données non trouvées'}), 400
         
         req = request.json
-        raw_pollutant = req.get('pollutant', '') # ex: "Température (°C)" ou "PM10"
+        raw_pollutant = req.get('pollutant', '')
         
-        # 1. Trouver la colonne de données dans le DataFrame
         data_col = next((c for c in df.columns if raw_pollutant.lower() in c.lower()), None)
-        if not data_col: return jsonify({'error': f"Colonne '{raw_pollutant}' introuvable."}), 400
+        if not data_col: return jsonify({'error': 'Polluant introuvable'}), 400
 
-        # 2. Identifier la clé de connaissance (Normalisation)
-        # On cherche des bouts de mots (ex: "temp" dans "Température")
+        # Identification de la clé pour éviter le "UNDEFINED"
         knowledge_key = None
-        normalized_name = "Variable Inconnue"
-        
         for snippet, key in VAR_MAPPING.items():
             if snippet in raw_pollutant.lower() or snippet in data_col.lower():
                 knowledge_key = key
-                normalized_name = key
                 break
         
-        # 3. Récupérer les infos encyclopédiques
-        if knowledge_key:
-            knowledge = POLLUTANT_KNOWLEDGE.get(knowledge_key)
-        else:
-            # Cas par défaut pour variable inconnue
-            knowledge = {
-                'desc': "Aucune définition encyclopédique disponible pour cette variable.",
-                'hausse': "Non défini.",
-                'baisse': "Non défini."
-            }
-            normalized_name = raw_pollutant # On garde le nom original
+        # Le nom affiché sera le knowledge_key (ex: PM10) au lieu de rien
+        display_name = knowledge_key if knowledge_key else raw_pollutant
 
-        # 4. Identification du Groupe (Ville)
-        group_col = next((c for c in df.columns if c.lower() in ['city', 'ville', 'commune', 'nom', 'source']), None)
-        
+        group_col = next((c for c in df.columns if c.lower() in ['city', 'ville', 'nom']), None)
         analysis_results = {}
 
-        def analyze_subset(sub_df, group_name):
+        def analyze_subset(sub_df):
             valid_df = sub_df.dropna(subset=[data_col])
             if valid_df.empty: return None
             
-            # Stats locales
-            local_mean = valid_df[data_col].mean()
-            local_max = valid_df[data_col].max()
-            local_min = valid_df[data_col].min()
-            
-            # Pics (Top 3 Max)
-            peaks_df = valid_df.nlargest(3, data_col)
-            peaks_list = []
-            for _, row in peaks_df.iterrows():
-                ctx = get_time_context(row['temps'])
-                peaks_list.append({
-                    'time': row['temps'].strftime('%d/%m %H:%M'),
-                    'value': round(row[data_col], 2),
-                    'explanation': generate_explanation(knowledge_key, row[data_col], ctx)
-                })
+            # --- PIC (MAX) ---
+            peak_row = valid_df.loc[valid_df[data_col].idxmax()]
+            ctx_peak = get_time_context(peak_row['temps'])
+            peak_data = {
+    'time': peak_row['temps'].strftime('%d/%m %H:%M'),
+    'value': round(peak_row[data_col], 2),
+    'explanation': generate_explanation(knowledge_key, peak_row[data_col], ctx_peak, is_peak=True)
+}
 
-            # Creux (Top 3 Min)
-            troughs_df = valid_df.nsmallest(3, data_col)
-            troughs_list = []
-            for _, row in troughs_df.iterrows():
-                troughs_list.append({
-                    'time': row['temps'].strftime('%d/%m %H:%M'),
-                    'value': round(row[data_col], 2)
-                })
+            # --- CREUX (MIN) ---
+            trough_row = valid_df.loc[valid_df[data_col].idxmin()]
+            ctx_trough = get_time_context(trough_row['temps'])
+            trough_data = {
+    'time': trough_row['temps'].strftime('%d/%m %H:%M'),
+    'value': round(trough_row[data_col], 2),
+    # IMPORTANT : bien mettre is_peak=False ici !
+    'explanation': generate_explanation(knowledge_key, trough_row[data_col], ctx_trough, is_peak=False)
+}
             
             return {
-                'stats': {
-                    'avg': round(local_mean, 2),
-                    'max': round(local_max, 2),
-                    'min': round(local_min, 2)
-                },
-                'peaks': peaks_list,
-                'troughs': troughs_list
+                'stats': {'avg': round(valid_df[data_col].mean(), 2), 'max': round(peak_row[data_col], 2), 'min': round(trough_row[data_col], 2)},
+                'peaks': [peak_data],
+                'troughs': [trough_data]
             }
 
-        # Exécution
         if group_col:
-            groups = df[group_col].dropna().unique()
-            for g in groups:
-                res = analyze_subset(df[df[group_col] == g], str(g))
+            for g in df[group_col].dropna().unique():
+                res = analyze_subset(df[df[group_col] == g])
                 if res: analysis_results[str(g)] = res
         else:
-            res = analyze_subset(df, "Analyse Globale")
+            res = analyze_subset(df)
             if res: analysis_results["Global"] = res
 
         return jsonify({
-            'pollutant': normalized_name, # Nom propre (ex: TEMPERATURE)
-            'knowledge': knowledge,
+            'pollutant': display_name,  # On envoie un nom valide ici pour le badge
+            'knowledge': POLLUTANT_KNOWLEDGE.get(knowledge_key, {}),
             'analysis': analysis_results
         })
 
     except Exception as e:
-        print(f"ERREUR: {e}")
         return jsonify({'error': str(e)}), 500
 if __name__ == '__main__':
     app.run(debug=True)

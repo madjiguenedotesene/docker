@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Charger Données</title>
+    <title>Charger Données - PolluGard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
         /* Animation pour le chargement */
         .loading-spinner {
-            width: 40px; height: 40px;
-            border: 4px solid #e5e7eb;
+            width: 24px; height: 24px;
+            border: 3px solid #e5e7eb;
             border-top-color: #3b82f6;
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -31,24 +31,17 @@
         </div>
     </nav>
 
-    <!-- MAIN CONTAINER -->
     <main class="container mx-auto p-4 md:p-8 flex-grow flex flex-col md:flex-row gap-6 pt-24">
         
-        <!-- 1. SIDEBAR : LISTE INTELLIGENTE (Masquée par défaut) -->
-        <aside id="sidebar-panel" class="hidden w-full md:w-1/3 lg:w-1/4 flex-col h-[80vh] transition-all duration-300">
+        <aside id="sidebar-panel" class="hidden w-full md:w-1/3 lg:w-1/4 flex-col h-[85vh] transition-all duration-300">
             <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex flex-col h-full shadow-xl">
                 <div class="mb-4 flex justify-between items-center">
                     <div>
                         <h2 class="text-xl font-bold text-white mb-1">📍 Sites Disponibles</h2>
                         <p class="text-[10px] text-gray-300">Ctrl + Clic pour sélectionner plusieurs</p>
                     </div>
-                    <!-- Bouton pour fermer la liste -->
-                    <button id="close-sidebar-btn" class="text-white hover:text-red-400 focus:outline-none text-xl">
-                        ✕
-                    </button>
+                    <button id="close-sidebar-btn" class="text-white hover:text-red-400 focus:outline-none text-xl">✕</button>
                 </div>
-                
-                <!-- Zone de liste défilante -->
                 <div id="sidebar-list" class="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-2">
                     <div class="animate-pulse flex space-x-4">
                         <div class="flex-1 space-y-4 py-1">
@@ -60,67 +53,67 @@
             </div>
         </aside>
 
-        <!-- 2. MAIN CONTENT : FORMULAIRE -->
         <div id="main-content" class="w-full transition-all duration-300">
             <h1 class="text-3xl md:text-4xl font-extrabold mb-6 text-white text-center md:text-left">Accéder aux Expériences</h1>
 
-            <div class="main-card p-6 md:p-10 text-center relative">
+            <div class="main-card p-6 md:p-10 text-center relative bg-white rounded-2xl shadow-xl">
                 
-                <form id="upload-form" class="space-y-6 max-w-2xl mx-auto">
+                <form id="upload-form" class="space-y-8 max-w-3xl mx-auto" enctype="multipart/form-data">
                     
-                    <div class="text-left">
+                    <div class="text-left bg-blue-50 p-6 rounded-xl border border-blue-100">
+                        <h3 class="text-lg font-bold text-blue-800 mb-4 flex items-center">
+                          Données Distantes
+                        </h3>
+                        
                         <div class="flex justify-between items-end mb-2">
-                            <label for="code-exp" class="block text-gray-700 font-bold text-lg">
-                                Codes Expérience
-                            </label>
-                            
-                            <!-- NOUVEAU BOUTON TOGGLE -->
-                            <button type="button" id="toggle-sidebar-btn" class="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center gap-1">
-                                <span>📍 Voir la liste des sites</span>
+                            <label for="code-exp" class="block text-gray-700 font-bold text-sm">Codes Expérience</label>
+                            <button type="button" id="toggle-sidebar-btn" class="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center gap-1">
+                                <span>📍 Voir la liste</span>
                             </button>
                         </div>
                         
-                        <div class="relative">
-                            <input type="text" 
-                                   id="code-exp" 
-                                   name="code_exp" 
-                                   placeholder="Tapez un code ou sélectionnez dans la liste..." 
-                                   class="w-full p-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-800 text-lg shadow-sm transition-all pr-12"
-                                   autocomplete="off">
-                            
-                            <button type="button" 
-                                    id="search-icon-btn"
-                                    class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer hover:scale-110 transition-transform focus:outline-none"
-                                    title="Lancer la recherche">
-                                <span class="text-gray-400 text-xl hover:text-blue-600">🔍</span>
-                            </button>
+                        <div class="relative mb-4">
+                            <input type="text" id="code-exp" name="code_exp" placeholder="Tapez un code ou sélectionnez dans la liste..." 
+                                   class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-800 text-base" autocomplete="off">
                         </div>
 
-                        <p class="text-sm text-gray-500 mt-2">Vous pouvez saisir plusieurs codes séparés par des virgules.</p>
-
-                        <div class="mt-4">
-                            <button type="button" id="toggle-city-btn" class="text-blue-600 text-sm hover:underline focus:outline-none flex items-center">
-                                <span>📍 La ville n'est pas détectée ? Cliquez ici pour la saisir manuellement.</span>
-                            </button>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Identifiant</label>
+                                <input type="text" name="username" placeholder="Votre identifiant" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">Mot de passe</label>
+                                <input type="password" name="password" placeholder="Votre mot de passe" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
+                            </div>
                         </div>
+                        
+                        <p class="text-xs text-gray-500 mt-2 italic">* Connexion requise</p>
+                    </div>
 
-                        <div id="city-input-container" class="hidden mt-3 transition-all duration-300 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                            <label for="city-exp" class="block text-sm text-blue-800 font-semibold mb-1">
-                                Ville par défaut 
-                            </label>
-                            <input type="text" 
-                                   id="city-exp" 
-                                   name="city_exp" 
-                                   placeholder="Ex: Evry" 
-                                   class="w-full p-2 border border-blue-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800">
-                            <p class="text-xs text-blue-600 mt-1">Cette ville sera utilisée si le système n'arrive pas à la deviner via le code ou le GPS.</p>
+                    <div class="text-left bg-gray-50 p-6 rounded-xl border border-gray-200">
+                        <h3 class="text-lg font-bold text-gray-800 mb-2 flex items-center">
+                            Fichiers (CSV)
+                        </h3>
+                        <label class="block w-full cursor-pointer hover:bg-gray-100 transition-colors border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                            <span class="text-gray-600">Cliquez pour ajouter des fichiers</span>
+                            <input type="file" name="local_files" multiple accept=".csv" class="hidden">
+                        </label>
+                    </div>
+
+                    <div class="text-left">
+                        <button type="button" id="toggle-city-btn" class="text-blue-600 text-sm hover:underline focus:outline-none flex items-center">
+                            <span>📍 Forcer une ville manuellement</span>
+                        </button>
+                        <div id="city-input-container" class="hidden mt-2 p-3 bg-gray-100 rounded border border-gray-200">
+                            <input type="text" name="city_exp" placeholder="Ex: Paris" class="w-full p-2 border rounded text-sm">
                         </div>
                     </div>
 
-                    <div class="mt-8">
-                        <button type="submit" id="upload-btn" class="btn-gradient w-full py-3 text-lg font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center">
-                            <span id="upload-text">Charger les Données</span>
-                            <div id="upload-spinner" class="hidden w-5 h-5 border-2 border-white border-opacity-50 rounded-full animate-spin ml-2"></div>
+                    <div class="pt-4">
+                        <button type="submit" id="upload-btn" class="btn-gradient w-full py-4 text-xl font-bold shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 flex items-center justify-center text-white rounded-full">
+                            <span id="upload-text">CHARGER LES DONNÉES</span>
+                            <div id="upload-spinner" class="hidden loading-spinner ml-3"></div>
                         </button>
                     </div>
                 </form>
@@ -129,28 +122,39 @@
 
             </div>
 
-            <div id="df-preview-card" class="main-card p-6 md:p-10 text-center mt-8 hidden">
+            <div id="df-preview-card" class="main-card p-6 md:p-10 text-center mt-8 hidden bg-white rounded-2xl shadow-xl">
                 <div id="df-info" class="text-left text-gray-700 mb-4 font-semibold"></div>
-                <div class="table-preview">
+                <div class="table-preview overflow-auto max-h-96 border rounded-lg">
                     <div id="df-preview" class="text-sm"></div>
                 </div>
-                <div id="redirect-btn-container" class="mt-6 flex flex-wrap gap-4 justify-center hidden">
-                    <a href="/data-preparation" class="btn-gradient w-full md:w-auto">Aller à la page de Nettoyage →</a>
+                
+                <div class="mt-8 flex flex-col md:flex-row gap-4 justify-center items-center">
+                    <div id="download-section" class="hidden">
+                        <a href="/download_data" class="btn-gradient bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg flex items-center justify-center gap-2 no-underline transform hover:scale-105 transition-transform">
+                            <span>Télécharger CSV </span>
+                        </a>
+                    </div>
+                    
+                    <a href="/data-preparation" class="btn-gradient py-3 px-8 text-white font-bold rounded-full shadow-lg hover:scale-105 transition-transform flex items-center justify-center no-underline">
+                        Nettoyage →
+                    </a>
                 </div>
             </div>
         </div>
     </main>
 
-    <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
+     <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
         <div class="container mx-auto">
             <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
                 <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
-                <a href="/upload-data" class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
+                <a href="/upload-data"/compare_with_meteo' class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
                 <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧼 Nettoyage</a>
                 <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📈 Visualisation</a>
                 <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮 Prédiction</a>
                 <a href="/comparaison" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
             </div>
+            </div>
+
         </div>
     </footer>
 
@@ -161,23 +165,20 @@
         const uploadText = document.getElementById('upload-text');
         const uploadSpinner = document.getElementById('upload-spinner');
         const previewCard = document.getElementById('df-preview-card'); 
-        const redirectBtnContainer = document.getElementById('redirect-btn-container');    
         const messageContainer = document.getElementById('message-container');
         const previewDiv = document.getElementById('df-preview');
         const infoDiv = document.getElementById('df-info');
         const codeInput = document.getElementById('code-exp');
-        const searchIconBtn = document.getElementById('search-icon-btn'); 
         const cityContainer = document.getElementById('city-input-container');
-        const cityInput = document.getElementById('city-exp');
         const toggleCityBtn = document.getElementById('toggle-city-btn');
         const sidebarList = document.getElementById('sidebar-list');
-        
         const sidebarPanel = document.getElementById('sidebar-panel');
         const mainContent = document.getElementById('main-content');
         const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
         const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+        const downloadSection = document.getElementById('download-section');
 
-        // --- GESTION DU TOGGLE LISTE ---
+        // --- GESTION SIDEBAR ---
         toggleSidebarBtn.addEventListener('click', () => {
             sidebarPanel.classList.remove('hidden');
             sidebarPanel.classList.add('flex');
@@ -194,8 +195,7 @@
             toggleSidebarBtn.classList.remove('hidden');
         });
 
-        // --- FONCTIONS UTILITAIRES ---
-
+        // --- FONCTIONS ---
         const displayMessage = (msg, type) => {
             messageContainer.textContent = msg;
             messageContainer.className = `mt-6 text-center text-lg font-medium ${type === 'error' ? 'text-red-500' : 'text-blue-600'}`;
@@ -203,147 +203,94 @@
 
         const formatDate = (dateStr) => {
             if (!dateStr) return 'N/A';
-            try {
-                // Le format est YYYY-MM-DD HH:MM:SS
-                const date = new Date(dateStr);
-                return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            } catch (e) {
-                return dateStr;
-            }
+            try { return new Date(dateStr).toLocaleDateString('fr-FR'); } catch { return dateStr; }
         };
 
-        // --- CHARGEMENT DES DONNÉES ---
-
+        // --- CHARGEMENT LISTE API ---
         document.addEventListener('DOMContentLoaded', async () => {
-            sidebarList.innerHTML = '<div class="text-center text-white/50 py-4">Chargement...</div>';
-
             try {
-                // CORRECTION ICI : Ajout de ?t= + timestamp pour forcer le rechargement et contourner le cache
                 const response = await fetch('/api/experiments?t=' + Date.now());
-                
                 if (response.ok) {
                     const experiments = await response.json();
                     sidebarList.innerHTML = ''; 
-
-                    experiments.forEach((exp, index) => {
-                        const val = exp.CodeExp;
-                        // On utilise directement les champs de l'API fournie
-                        const ville = exp.City || "Ville inconnue";
-                        const dept = exp.Departement || "";
-                        const start = formatDate(exp.StartDate);
-                        const end = formatDate(exp.LastUpdate);
-                        
-                        // Création de l'élément de liste
+                    experiments.forEach(exp => {
                         const sideItem = document.createElement('div');
                         sideItem.className = "p-3 rounded-lg bg-black/20 hover:bg-blue-600/30 transition-colors cursor-pointer border border-white/5 flex items-center justify-between group select-none mb-2";
-                        
-                        // Construction du texte
-                        const deptHtml = dept ? `<span class="text-gray-300 font-normal text-xs ml-1">(${dept})</span>` : '';
-                        
                         sideItem.innerHTML = `
                             <div class="flex flex-col text-left">
-                                <div class="text-sm font-bold text-white">${ville}${deptHtml}</div>
-                                <div class="text-[11px] text-gray-300 mt-1">
-                                    <span class="text-blue-300">Du</span> ${start} <span class="text-blue-300">au</span> ${end}
-                                </div>
-                                <div class="text-[10px] text-gray-400 mt-0.5 font-mono">${val}</div>
+                                <div class="text-sm font-bold text-white">${exp.City || "Inconnu"}</div>
+                                <div class="text-[10px] text-gray-400 mt-0.5 font-mono">${exp.CodeExp}</div>
                             </div>
-                            <span class="text-white opacity-0 group-hover:opacity-100 transition-opacity self-center">→</span>
+                            <span class="text-white opacity-0 group-hover:opacity-100 transition-opacity">→</span>
                         `;
-
-                        // GESTION DU CLIC (Multi-sélection)
                         sideItem.addEventListener('click', (e) => {
+                            let current = codeInput.value.split(',').map(s => s.trim()).filter(s => s);
                             if (e.ctrlKey || e.metaKey) {
-                                // Multi-select
-                                let currentValues = codeInput.value.split(',').map(s => s.trim()).filter(s => s !== "");
-                                if (currentValues.includes(val)) {
-                                    // Désélectionner
-                                    currentValues = currentValues.filter(c => c !== val);
-                                    sideItem.classList.remove('bg-blue-600/50', 'border-blue-400');
-                                    sideItem.classList.add('bg-black/20');
-                                } else {
-                                    // Sélectionner
-                                    currentValues.push(val);
-                                    sideItem.classList.remove('bg-black/20');
-                                    sideItem.classList.add('bg-blue-600/50', 'border-blue-400');
-                                }
-                                codeInput.value = currentValues.join(', ');
+                                current.includes(exp.CodeExp) ? current = current.filter(c => c !== exp.CodeExp) : current.push(exp.CodeExp);
                             } else {
-                                // Simple clic (remplacement)
-                                // Reset visuel des autres
-                                Array.from(sidebarList.children).forEach(child => {
-                                    child.classList.remove('bg-blue-600/50', 'border-blue-400');
-                                    child.classList.add('bg-black/20');
-                                });
-                                
-                                codeInput.value = val;
-                                sideItem.classList.remove('bg-black/20');
-                                sideItem.classList.add('bg-blue-600/50', 'border-blue-400');
-                                
-                                codeInput.classList.add('ring-4', 'ring-blue-500');
-                                setTimeout(() => codeInput.classList.remove('ring-4', 'ring-blue-500'), 300);
+                                current = [exp.CodeExp];
                             }
-                            codeInput.focus();
+                            codeInput.value = current.join(', ');
                         });
-
                         sidebarList.appendChild(sideItem);
                     });
                 }
-            } catch (error) {
-                console.error("Info: Impossible de charger la liste", error);
-                sidebarList.innerHTML = '<div class="text-red-400 text-center">Erreur de chargement</div>';
-            }
+            } catch (error) { console.error("Erreur liste", error); }
         });
 
-        // --- GESTION FORMULAIRE ---
-        toggleCityBtn.addEventListener('click', () => { cityContainer.classList.toggle('hidden'); });
-        searchIconBtn.addEventListener('click', () => {
-            if (codeInput.value.trim() !== "") { uploadBtn.click(); } else { codeInput.focus(); }
-        });
+        // --- SOUMISSION FORMULAIRE ---
+        toggleCityBtn.addEventListener('click', () => cityContainer.classList.toggle('hidden'));
             
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Validation basique côté client
             const codeVal = codeInput.value.trim();
-            if (!codeVal) { displayMessage('Veuillez entrer au moins un code expérience.', 'error'); return; }
-                        
-            const formData = new FormData();
-            formData.append('code_exp', codeVal);
-            if (!cityContainer.classList.contains('hidden') && cityInput.value.trim() !== '') {
-                formData.append('city_exp', cityInput.value.trim());
+            const fileInput = document.querySelector('input[name="local_files"]');
+            const hasFiles = fileInput.files.length > 0;
+            const username = document.querySelector('input[name="username"]').value;
+            const password = document.querySelector('input[name="password"]').value;
+
+            if (!codeVal && !hasFiles) {
+                displayMessage('Veuillez saisir un code OU sélectionner un fichier local.', 'error');
+                return;
             }
+            if (codeVal && (!username || !password)) {
+                displayMessage('Identifiants requis pour le téléchargement distant.', 'error');
+                return;
+            }
+            
+            const formData = new FormData(uploadForm);
             
             uploadBtn.disabled = true;
             uploadText.textContent = "Traitement en cours...";
             uploadSpinner.classList.remove('hidden');
             displayMessage('', 'info'); 
+            previewCard.classList.add('hidden');
             
             try {
                 const response = await fetch('/upload', { method: 'POST', body: formData });
                 const result = await response.json();
                 
                 if (response.ok) {
-                    const customPreview = result.preview.replace(/<th>city<\/th>/gi, '<th>Villes</th>');
-                    previewDiv.innerHTML = customPreview;
+                    previewDiv.innerHTML = result.preview.replace(/<th>city<\/th>/gi, '<th>Villes</th>');
                     const cities = [...new Set(result.data_info.uploaded_files.map(f => f.city))].join(', ');
                     infoDiv.innerHTML = `
-                        <p class="text-green-600 mb-2">✅ <strong>Villes identifiées :</strong> ${cities}</p>
-                        <p>📊 <strong>Total Lignes :</strong> ${result.data_info.rows}</p>
-                        <p>📋 <strong>Total Colonnes :</strong> ${result.data_info.columns.length}</p>
+                        <p class="text-green-600 mb-2">✅ <strong>Villes :</strong> ${cities}</p>
+                        <p>📊 <strong>Lignes :</strong> ${result.data_info.rows} | <strong>Colonnes :</strong> ${result.data_info.columns.length}</p>
                     `;
                     previewCard.classList.remove('hidden'); 
-                    redirectBtnContainer.classList.remove('hidden');
-                    displayMessage('', 'success');
+                    downloadSection.classList.remove('hidden'); // Affiche le bouton de téléchargement
+                    displayMessage(result.message, 'success');
                 } else {
-                    previewCard.classList.add('hidden');
-                    redirectBtnContainer.classList.add('hidden');
                     displayMessage(result.error, 'error');
                 }
             } catch (error) {
-                console.error('Erreur technique:', error);
+                console.error(error);
                 displayMessage('Erreur de communication avec le serveur.', 'error');
             } finally {
                 uploadBtn.disabled = false;
-                uploadText.textContent = "Charger les Données";
+                uploadText.textContent = "CHARGER LES DONNÉES";
                 uploadSpinner.classList.add('hidden');
             }
         });
