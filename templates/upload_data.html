@@ -42,11 +42,11 @@
                     🌐 Eurosmart API
                 </button>
                 <button onclick="switchTab('local')" id="btn-tab-local" class="nav-link px-8 py-2 border-white/30 text-white/70 hover:scale-105 transition-all">
-                    💻 Fichier Local (CSV/Excel)
+                    💻 Fichier Local
                 </button>
             </div>
 
-            <div class="main-card p-6 md:p-10 relative">
+            <div class="main-card p-6 md:p-10 relative bg-white rounded-[2rem]">
                 
                 <form id="upload-form" class="space-y-4 max-w-2xl mx-auto">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
@@ -62,17 +62,20 @@
 
                     <div class="text-left space-y-4">
                         <div class="flex justify-between items-end">
-                            <label class="block text-gray-700 font-bold">Codes Expérience</label>
+                            <div>
+                                <label class="block text-gray-700 font-bold">Codes Expérience</label>
+                                <p class="text-[10px] text-gray-400 italic">Séparez les codes par des virgules (ex: PARIS-01, EVRY-REEL)</p>
+                            </div>
                             <button type="button" id="toggle-sidebar-btn" class="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200">📍 Voir la liste</button>
                         </div>
                         <div class="relative">
-                            <input type="text" id="code-exp" name="code_exp" placeholder="EVRY-REEL, PARIS-01..." class="w-full p-4 border-2 border-gray-200 rounded-2xl focus:border-purple-500 outline-none text-gray-800 shadow-inner pr-12">
+                            <input type="text" id="code-exp" name="code_exp" placeholder="Sélectionnez ou saisissez vos codes..." class="w-full p-4 border-2 border-gray-100 rounded-2xl focus:border-purple-500 outline-none text-gray-800 shadow-inner pr-12">
                             <button type="button" id="search-icon-btn" class="absolute inset-y-0 right-0 pr-4 text-xl">🔍</button>
                         </div>
                     </div>
 
                     <button type="submit" class="btn-gradient w-full py-4 text-lg shadow-xl flex items-center justify-center gap-3 mt-4">
-                        <span>Se connecter et Charger</span>
+                        <span>Lancer l'import groupé</span>
                         <div id="upload-spinner" class="hidden loading-spinner border-t-white"></div>
                     </button>
                 </form>
@@ -80,20 +83,20 @@
                 <form id="local-form" class="space-y-6 max-w-2xl mx-auto hidden">
                     <div class="p-10 border-4 border-dashed border-purple-100 rounded-[2rem] bg-purple-50/30 text-center group hover:border-purple-300 transition-colors">
                         <label for="file_local" class="cursor-pointer block">
-                            <span class="text-5xl block mb-3 group-hover:scale-110 transition-transform"></span>
-                            <span class="text-purple-700 font-bold text-lg">Importer un fichier CSV ou Excel</span>
-                            <input type="file" id="file_local" name="file_local" class="hidden" accept=".csv, .xlsx, .xls">
+                            <span class="text-5xl block mb-3 group-hover:scale-110 transition-transform">📂</span>
+                            <span class="text-purple-700 font-bold text-lg">Importer des fichiers (CSV/Excel)</span>
+                            <input type="file" id="file_local" name="file_local" class="hidden" accept=".csv, .xlsx, .xls" multiple>
                             <p id="file-name-display" class="mt-3 text-sm text-gray-400 italic">Aucun fichier sélectionné</p>
                         </label>
                     </div>
                     
                     <div>
                         <label class="block text-gray-700 font-bold mb-2 ml-1 text-left">Nom de la ville / du site</label>
-                        <input type="text" name="city_manual" placeholder="Ex: Salon, Bureau, Lille..." class="w-full p-4 border-2 border-gray-200 rounded-2xl outline-none focus:border-purple-500 shadow-inner">
+                        <input type="text" name="city_manual" placeholder="Ex: Salon, Bureau, Lille..." class="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-purple-500 shadow-inner">
                     </div>
 
                     <button type="submit" class="btn-gradient w-full py-4 text-lg shadow-xl flex items-center justify-center gap-3">
-                        <span>Charger le fichier local</span>
+                        <span>Charger les fichiers locaux</span>
                         <div id="local-spinner" class="hidden loading-spinner border-t-white"></div>
                     </button>
                 </form>
@@ -101,14 +104,14 @@
                 <div id="message-container" class="mt-6 text-center font-medium"></div>
             </div>
 
-            <div id="df-preview-card" class="main-card p-6 md:p-10 mt-8 hidden">
+            <div id="df-preview-card" class="main-card p-6 md:p-10 mt-8 hidden bg-white rounded-[2rem]">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div id="df-info" class="text-gray-700"></div>
                     <a href="/download_data" class="btn-gradient px-6 py-2 text-sm flex items-center gap-2">📥 Télécharger CSV</a>
                 </div>
-                <div class="table-preview"><div id="df-preview"></div></div>
+                <div class="table-preview overflow-x-auto"><div id="df-preview"></div></div>
                 <div id="redirect-btn-container" class="mt-8 flex justify-center hidden">
-                    <a href="/visualizations" class="btn-gradient px-10 py-4 text-lg">Visualiser→</a>
+                    <a href="/visualizations" class="btn-gradient px-10 py-4 text-lg">Visualiser les données →</a>
                 </div>
             </div>
         </div>
@@ -128,8 +131,9 @@
         const messageContainer = document.getElementById('message-container');
         const previewCard = document.getElementById('df-preview-card');
         const redirectContainer = document.getElementById('redirect-btn-container');
+        const codeExpInput = document.getElementById('code-exp');
 
-        // --- GESTION DES ONGLETS ---
+        // --- NAVIGATION ONGLET ---
         function switchTab(mode) {
             const euroForm = document.getElementById('upload-form');
             const localForm = document.getElementById('local-form');
@@ -151,7 +155,7 @@
             }
         }
 
-        // --- SIDEBAR API ---
+        // --- SIDEBAR ---
         const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
         const sidebarPanel = document.getElementById('sidebar-panel');
         const mainContent = document.getElementById('main-content');
@@ -169,57 +173,58 @@
             toggleSidebarBtn.classList.remove('hidden');
         });
 
-        // --- LOGIQUE D'UPLOAD ---
+        // --- GESTION FICHIERS LOCAUX ---
+        document.getElementById('file_local').addEventListener('change', (e) => {
+            const files = e.target.files;
+            const display = document.getElementById('file-name-display');
+            display.textContent = files.length > 0 ? `${files.length} fichier(s) sélectionné(s)` : "Aucun fichier sélectionné";
+        });
+
+        // --- LOGIQUE ENVOI ---
         const displayMessage = (msg, type) => {
             messageContainer.textContent = msg;
             messageContainer.className = `mt-6 p-4 rounded-xl text-center font-medium ${type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'}`;
         };
 
         const handleSuccess = (result) => {
-            const customPreview = result.preview.replace(/<th>city<\/th>/gi, '<th>Villes</th>');
-            document.getElementById('df-preview').innerHTML = customPreview;
-            document.getElementById('df-info').innerHTML = `<p class="text-green-600 font-bold text-sm">✓ ${result.message}</p><p class="text-xs text-gray-500">${result.data_info.rows} lignes chargées.</p>`;
+            document.getElementById('df-preview').innerHTML = result.preview;
+            document.getElementById('df-info').innerHTML = `<p class="text-green-600 font-bold">✓ Chargement réussi</p><p class="text-xs text-gray-500">${result.data_info.rows} lignes fusionnées.</p>`;
             previewCard.classList.remove('hidden');
             redirectContainer.classList.remove('hidden');
-            displayMessage('Données prêtes pour l\'analyse.', 'success');
+            displayMessage('Données fusionnées avec succès.', 'success');
             previewCard.scrollIntoView({ behavior: 'smooth' });
         };
 
+        // Formulaire API
         document.getElementById('upload-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const spinner = document.getElementById('upload-spinner');
             spinner.classList.remove('hidden');
-            displayMessage('Authentification Eurosmart...', 'info');
+            displayMessage('Requête multi-sites en cours...', 'info');
             try {
                 const response = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
                 const result = await response.json();
                 response.ok ? handleSuccess(result) : displayMessage(result.error, 'error');
-            } catch (err) { displayMessage('Erreur de communication.', 'error'); }
+            } catch (err) { displayMessage('Erreur réseau.', 'error'); }
             finally { spinner.classList.add('hidden'); }
         });
 
-        document.getElementById('file_local').addEventListener('change', (e) => {
-            document.getElementById('file-name-display').textContent = e.target.files[0] ? e.target.files[0].name : "Aucun fichier sélectionné";
-        });
-
+        // Formulaire Local
         document.getElementById('local-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const spinner = document.getElementById('local-spinner');
             spinner.classList.remove('hidden');
-            displayMessage('Traitement du fichier local...', 'info');
             try {
                 const response = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
                 const result = await response.json();
                 response.ok ? handleSuccess(result) : displayMessage(result.error, 'error');
-            } catch (err) { displayMessage('Erreur d\'envoi.', 'error'); }
+            } catch (err) { displayMessage('Erreur chargement.', 'error'); }
             finally { spinner.classList.add('hidden'); }
         });
 
-        // --- CHARGEMENT LISTE SITES AVEC DATES ---
+        // --- CHARGEMENT SIDEBAR AVEC AJOUT MULTIPLE ---
         document.addEventListener('DOMContentLoaded', async () => {
             const list = document.getElementById('sidebar-list');
-            
-            // Fonction pour formater la date YYYY-MM-DD -> DD/MM/YYYY
             const formatDate = (dateStr) => {
                 if (!dateStr) return '...';
                 return dateStr.split(' ')[0].split('-').reverse().join('/');
@@ -231,29 +236,31 @@
                     const data = await res.json();
                     list.innerHTML = '';
                     data.forEach(exp => {
-                        const start = formatDate(exp.StartDate);
-                        const end = formatDate(exp.LastUpdate);
-
                         const item = document.createElement('div');
                         item.className = "p-3 rounded-xl bg-white/5 hover:bg-white/20 transition-all border border-white/10 cursor-pointer mb-3 group shadow-sm";
-                        
                         item.innerHTML = `
                             <div class="flex justify-between items-start mb-1">
                                 <strong class="text-white text-sm">${exp.City || "Inconnu"}</strong>
                                 <span class="text-[9px] text-blue-300 font-mono bg-blue-900/40 border border-blue-500/30 px-1.5 py-0.5 rounded-md">${exp.CodeExp}</span>
                             </div>
-                            <div class="text-[10px] text-gray-400 group-hover:text-gray-200 transition-colors">
-                                Du <strong>${start}</strong> au <strong>${end}</strong>
+                            <div class="text-[10px] text-gray-400">
+                                Du <strong>${formatDate(exp.StartDate)}</strong> au <strong>${formatDate(exp.LastUpdate)}</strong>
                             </div>
                         `;
                         
+                        // Action au clic : Ajoute à la liste existante au lieu de remplacer
                         item.onclick = () => { 
-                            document.getElementById('code-exp').value = exp.CodeExp; 
+                            let currentVal = codeExpInput.value.trim();
+                            if (currentVal === "") {
+                                codeExpInput.value = exp.CodeExp;
+                            } else if (!currentVal.includes(exp.CodeExp)) {
+                                codeExpInput.value = currentVal + ", " + exp.CodeExp;
+                            }
                         };
                         list.appendChild(item);
                     });
                 }
-            } catch (e) { list.innerHTML = '<p class="text-red-400 p-2 text-xs">⚠️ Erreur de chargement liste</p>'; }
+            } catch (e) { list.innerHTML = '<p class="text-red-400 text-xs">Erreur de chargement liste</p>'; }
         });
     </script>
 </body>
