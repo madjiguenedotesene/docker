@@ -3,29 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Charger Données - PolluGard</title>
+    <title>Accès aux Données - Eurosmart</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <style>
-        /* Animation pour le chargement */
-        .loading-spinner {
-            width: 24px; height: 24px;
-            border: 3px solid #e5e7eb;
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
 </head>
-<body class="flex flex-col min-h-screen bg-gray-900">
+<body class="flex flex-col min-h-screen">
 
-    <nav class="fixed top-0 left-0 w-full z-10 p-4 bg-gray-900/90 backdrop-blur-md shadow-md">
+    <nav class="fixed top-0 left-0 w-full z-50 p-4 top-nav backdrop-blur-md shadow-md">
         <div class="container mx-auto flex justify-between items-center relative h-10">
-            <a href="/" class="h-10 flex items-center z-10">
-                 <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
+            <a href="/" class="h-10 flex items-center">
+                 <img src="static/images/logo.png" alt="Logo Eurosmart" class="h-12">
             </a>
-            <a href="/" class="h-10 flex items-center justify-end z-10">
+            <a href="/" class="h-10 flex items-center justify-end">
                  <img src="static/images/pollugard.png" alt="Logo Pollugard" class="h-12">
             </a>
         </div>
@@ -33,266 +22,238 @@
 
     <main class="container mx-auto p-4 md:p-8 flex-grow flex flex-col md:flex-row gap-6 pt-24">
         
-        <aside id="sidebar-panel" class="hidden w-full md:w-1/3 lg:w-1/4 flex-col h-[85vh] transition-all duration-300">
-            <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex flex-col h-full shadow-xl">
+        <aside id="sidebar-panel" class="hidden w-full md:w-1/3 lg:w-1/4 flex-col h-[80vh] transition-all duration-300">
+            <div class="bg-black/30 backdrop-blur-md border border-white/20 rounded-[2rem] p-4 flex flex-col h-full shadow-xl text-white">
                 <div class="mb-4 flex justify-between items-center">
-                    <div>
-                        <h2 class="text-xl font-bold text-white mb-1">📍 Sites Disponibles</h2>
-                        <p class="text-[10px] text-gray-300">Ctrl + Clic pour sélectionner plusieurs</p>
-                    </div>
-                    <button id="close-sidebar-btn" class="text-white hover:text-red-400 focus:outline-none text-xl">✕</button>
+                    <h2 class="text-xl font-bold">📍 Sites Eurosmart</h2>
+                    <button id="close-sidebar-btn" class="hover:text-red-400 transition-colors text-xl">✕</button>
                 </div>
-                <div id="sidebar-list" class="flex-grow overflow-y-auto custom-scrollbar space-y-3 pr-2">
-                    <div class="animate-pulse flex space-x-4">
-                        <div class="flex-1 space-y-4 py-1">
-                            <div class="h-4 bg-white/20 rounded w-3/4"></div>
-                            <div class="h-4 bg-white/20 rounded"></div>
-                        </div>
-                    </div>
+                <div id="sidebar-list" class="flex-grow overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                    <div class="animate-pulse text-sm">Chargement de la liste...</div>
                 </div>
             </div>
         </aside>
 
         <div id="main-content" class="w-full transition-all duration-300">
-            <h1 class="text-3xl md:text-4xl font-extrabold mb-6 text-white text-center md:text-left">Accéder aux Expériences</h1>
+            <h1 class="text-3xl font-extrabold mb-6 text-white text-center md:text-left">Chargement des Données</h1>
 
-            <div class="main-card p-6 md:p-10 text-center relative bg-white rounded-2xl shadow-xl">
-                
-                <form id="upload-form" class="space-y-8 max-w-3xl mx-auto" enctype="multipart/form-data">
-                    
-                    <div class="text-left bg-blue-50 p-6 rounded-xl border border-blue-100">
-                        <h3 class="text-lg font-bold text-blue-800 mb-4 flex items-center">
-                          Données Distantes
-                        </h3>
-                        
-                        <div class="flex justify-between items-end mb-2">
-                            <label for="code-exp" class="block text-gray-700 font-bold text-sm">Codes Expérience</label>
-                            <button type="button" id="toggle-sidebar-btn" class="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition-colors flex items-center gap-1">
-                                <span>📍 Voir la liste</span>
-                            </button>
-                        </div>
-                        
-                        <div class="relative mb-4">
-                            <input type="text" id="code-exp" name="code_exp" placeholder="Tapez un code ou sélectionnez dans la liste..." 
-                                   class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-800 text-base" autocomplete="off">
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Identifiant</label>
-                                <input type="text" name="username" placeholder="Votre identifiant" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Mot de passe</label>
-                                <input type="password" name="password" placeholder="Votre mot de passe" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500">
-                            </div>
-                        </div>
-                        
-                        <p class="text-xs text-gray-500 mt-2 italic">* Connexion requise</p>
-                    </div>
-
-                    <div class="text-left bg-gray-50 p-6 rounded-xl border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-800 mb-2 flex items-center">
-                            Fichiers (CSV)
-                        </h3>
-                        <label class="block w-full cursor-pointer hover:bg-gray-100 transition-colors border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                            <span class="text-gray-600">Cliquez pour ajouter des fichiers</span>
-                            <input type="file" name="local_files" multiple accept=".csv" class="hidden">
-                        </label>
-                    </div>
-
-                    <div class="text-left">
-                        <button type="button" id="toggle-city-btn" class="text-blue-600 text-sm hover:underline focus:outline-none flex items-center">
-                            <span>📍 Forcer une ville manuellement</span>
-                        </button>
-                        <div id="city-input-container" class="hidden mt-2 p-3 bg-gray-100 rounded border border-gray-200">
-                            <input type="text" name="city_exp" placeholder="Ex: Paris" class="w-full p-2 border rounded text-sm">
-                        </div>
-                    </div>
-
-                    <div class="pt-4">
-                        <button type="submit" id="upload-btn" class="btn-gradient w-full py-4 text-xl font-bold shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-200 flex items-center justify-center text-white rounded-full">
-                            <span id="upload-text">CHARGER LES DONNÉES</span>
-                            <div id="upload-spinner" class="hidden loading-spinner ml-3"></div>
-                        </button>
-                    </div>
-                </form>
-
-                <div id="message-container" class="mt-6 text-center text-lg font-medium"></div>
-
+            <div class="flex gap-4 mb-6 justify-center md:justify-start">
+                <button onclick="switchTab('eurosmart')" id="btn-tab-eurosmart" class="btn-gradient px-8 py-2 rounded-full text-sm shadow-lg hover:scale-105 transition-all">
+                    🌐 Eurosmart API
+                </button>
+                <button onclick="switchTab('local')" id="btn-tab-local" class="nav-link px-8 py-2 border-white/30 text-white/70 hover:scale-105 transition-all">
+                    💻 Fichier Local (CSV/Excel)
+                </button>
             </div>
 
-            <div id="df-preview-card" class="main-card p-6 md:p-10 text-center mt-8 hidden bg-white rounded-2xl shadow-xl">
-                <div id="df-info" class="text-left text-gray-700 mb-4 font-semibold"></div>
-                <div class="table-preview overflow-auto max-h-96 border rounded-lg">
-                    <div id="df-preview" class="text-sm"></div>
-                </div>
+            <div class="main-card p-6 md:p-10 relative">
                 
-                <div class="mt-8 flex flex-col md:flex-row gap-4 justify-center items-center">
-                    <div id="download-section" class="hidden">
-                        <a href="/download_data" class="btn-gradient bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg flex items-center justify-center gap-2 no-underline transform hover:scale-105 transition-transform">
-                            <span>Télécharger CSV </span>
-                        </a>
+                <form id="upload-form" class="space-y-4 max-w-2xl mx-auto">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Identifiant</label>
+                            <input type="text" name="username" required placeholder="Login" class="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-400">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Mot de passe</label>
+                            <input type="password" name="password" required placeholder="••••••••" class="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-400">
+                        </div>
+                    </div>
+
+                    <div class="text-left space-y-4">
+                        <div class="flex justify-between items-end">
+                            <label class="block text-gray-700 font-bold">Codes Expérience</label>
+                            <button type="button" id="toggle-sidebar-btn" class="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200">📍 Voir la liste</button>
+                        </div>
+                        <div class="relative">
+                            <input type="text" id="code-exp" name="code_exp" placeholder="EVRY-REEL, PARIS-01..." class="w-full p-4 border-2 border-gray-200 rounded-2xl focus:border-purple-500 outline-none text-gray-800 shadow-inner pr-12">
+                            <button type="button" id="search-icon-btn" class="absolute inset-y-0 right-0 pr-4 text-xl">🔍</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-gradient w-full py-4 text-lg shadow-xl flex items-center justify-center gap-3 mt-4">
+                        <span>Se connecter et Charger</span>
+                        <div id="upload-spinner" class="hidden loading-spinner border-t-white"></div>
+                    </button>
+                </form>
+
+                <form id="local-form" class="space-y-6 max-w-2xl mx-auto hidden">
+                    <div class="p-10 border-4 border-dashed border-purple-100 rounded-[2rem] bg-purple-50/30 text-center group hover:border-purple-300 transition-colors">
+                        <label for="file_local" class="cursor-pointer block">
+                            <span class="text-5xl block mb-3 group-hover:scale-110 transition-transform"></span>
+                            <span class="text-purple-700 font-bold text-lg">Importer un fichier CSV ou Excel</span>
+                            <input type="file" id="file_local" name="file_local" class="hidden" accept=".csv, .xlsx, .xls">
+                            <p id="file-name-display" class="mt-3 text-sm text-gray-400 italic">Aucun fichier sélectionné</p>
+                        </label>
                     </div>
                     
-                    <a href="/data-preparation" class="btn-gradient py-3 px-8 text-white font-bold rounded-full shadow-lg hover:scale-105 transition-transform flex items-center justify-center no-underline">
-                        Nettoyage →
-                    </a>
+                    <div>
+                        <label class="block text-gray-700 font-bold mb-2 ml-1 text-left">Nom de la ville / du site</label>
+                        <input type="text" name="city_manual" placeholder="Ex: Salon, Bureau, Lille..." class="w-full p-4 border-2 border-gray-200 rounded-2xl outline-none focus:border-purple-500 shadow-inner">
+                    </div>
+
+                    <button type="submit" class="btn-gradient w-full py-4 text-lg shadow-xl flex items-center justify-center gap-3">
+                        <span>Charger le fichier local</span>
+                        <div id="local-spinner" class="hidden loading-spinner border-t-white"></div>
+                    </button>
+                </form>
+
+                <div id="message-container" class="mt-6 text-center font-medium"></div>
+            </div>
+
+            <div id="df-preview-card" class="main-card p-6 md:p-10 mt-8 hidden">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div id="df-info" class="text-gray-700"></div>
+                    <a href="/download_data" class="btn-gradient px-6 py-2 text-sm flex items-center gap-2">📥 Télécharger CSV</a>
+                </div>
+                <div class="table-preview"><div id="df-preview"></div></div>
+                <div id="redirect-btn-container" class="mt-8 flex justify-center hidden">
+                    <a href="/visualizations" class="btn-gradient px-10 py-4 text-lg">Visualiser→</a>
                 </div>
             </div>
         </div>
     </main>
 
-     <footer class="footer-transparent text-gray-400 p-4 mt-8 text-center">
-        <div class="container mx-auto">
-            <div class="flex justify-center items-center space-x-6 text-2xl mb-4">
-                <a href="/" class="transform hover:scale-110 transition duration-300">✨ Accueil</a>
-                <a href="/upload-data"/compare_with_meteo' class="transform hover:scale-110 transition duration-300">📁 Chargement</a>
-                <a href="/data-preparation" class="transform hover:scale-110 transition duration-300">🧼 Nettoyage</a>
-                <a href="/visualizations" class="transform hover:scale-110 transition duration-300">📈 Visualisation</a>
-                <a href="/prediction-modeling" class="transform hover:scale-110 transition duration-300">🔮 Prédiction</a>
-                <a href="/comparaison" class="transform hover:scale-110 transition duration-300">🌐 Comparaison</a>
-            </div>
-            </div>
-
+    <footer class="footer-transparent text-gray-400 p-6 mt-8 text-center">
+        <div class="container mx-auto flex flex-wrap justify-center gap-6">
+            <a href="/" class="nav-link">✨ Accueil</a>
+            <a href="/upload-data" class="nav-link">📁 Chargement</a>
+            <a href="/prediction-modeling" class="nav-link">🔮 Prédiction</a>
+            <a href="/visualizations" class="nav-link">📈 Visualisation</a>
+            <a href="/comparaison" class="nav-link">🌐 Comparaison</a>
         </div>
     </footer>
 
     <script>
-        // --- ELEMENTS DOM ---
-        const uploadForm = document.getElementById('upload-form');
-        const uploadBtn = document.getElementById('upload-btn');  
-        const uploadText = document.getElementById('upload-text');
-        const uploadSpinner = document.getElementById('upload-spinner');
-        const previewCard = document.getElementById('df-preview-card'); 
         const messageContainer = document.getElementById('message-container');
-        const previewDiv = document.getElementById('df-preview');
-        const infoDiv = document.getElementById('df-info');
-        const codeInput = document.getElementById('code-exp');
-        const cityContainer = document.getElementById('city-input-container');
-        const toggleCityBtn = document.getElementById('toggle-city-btn');
-        const sidebarList = document.getElementById('sidebar-list');
+        const previewCard = document.getElementById('df-preview-card');
+        const redirectContainer = document.getElementById('redirect-btn-container');
+
+        // --- GESTION DES ONGLETS ---
+        function switchTab(mode) {
+            const euroForm = document.getElementById('upload-form');
+            const localForm = document.getElementById('local-form');
+            const btnEuro = document.getElementById('btn-tab-eurosmart');
+            const btnLocal = document.getElementById('btn-tab-local');
+            const sidebar = document.getElementById('sidebar-panel');
+
+            if (mode === 'eurosmart') {
+                euroForm.classList.remove('hidden');
+                localForm.classList.add('hidden');
+                btnEuro.className = "btn-gradient px-8 py-2 rounded-full text-sm shadow-lg hover:scale-105 transition-all";
+                btnLocal.className = "nav-link px-8 py-2 border-white/30 text-white/70 hover:scale-105 transition-all";
+            } else {
+                euroForm.classList.add('hidden');
+                localForm.classList.remove('hidden');
+                sidebar.classList.add('hidden');
+                btnLocal.className = "btn-gradient px-8 py-2 rounded-full text-sm shadow-lg hover:scale-105 transition-all";
+                btnEuro.className = "nav-link px-8 py-2 border-white/30 text-white/70 hover:scale-105 transition-all";
+            }
+        }
+
+        // --- SIDEBAR API ---
+        const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
         const sidebarPanel = document.getElementById('sidebar-panel');
         const mainContent = document.getElementById('main-content');
-        const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
-        const closeSidebarBtn = document.getElementById('close-sidebar-btn');
-        const downloadSection = document.getElementById('download-section');
-
-        // --- GESTION SIDEBAR ---
+        
         toggleSidebarBtn.addEventListener('click', () => {
             sidebarPanel.classList.remove('hidden');
             sidebarPanel.classList.add('flex');
-            mainContent.classList.remove('w-full');
-            mainContent.classList.add('w-full', 'md:w-2/3', 'lg:w-3/4');
+            mainContent.classList.add('md:w-2/3', 'lg:w-3/4');
             toggleSidebarBtn.classList.add('hidden');
         });
 
-        closeSidebarBtn.addEventListener('click', () => {
+        document.getElementById('close-sidebar-btn').addEventListener('click', () => {
             sidebarPanel.classList.add('hidden');
-            sidebarPanel.classList.remove('flex');
             mainContent.classList.remove('md:w-2/3', 'lg:w-3/4');
-            mainContent.classList.add('w-full');
             toggleSidebarBtn.classList.remove('hidden');
         });
 
-        // --- FONCTIONS ---
+        // --- LOGIQUE D'UPLOAD ---
         const displayMessage = (msg, type) => {
             messageContainer.textContent = msg;
-            messageContainer.className = `mt-6 text-center text-lg font-medium ${type === 'error' ? 'text-red-500' : 'text-blue-600'}`;
+            messageContainer.className = `mt-6 p-4 rounded-xl text-center font-medium ${type === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-blue-500/10 text-blue-300 border border-blue-500/20'}`;
         };
 
-        const formatDate = (dateStr) => {
-            if (!dateStr) return 'N/A';
-            try { return new Date(dateStr).toLocaleDateString('fr-FR'); } catch { return dateStr; }
+        const handleSuccess = (result) => {
+            const customPreview = result.preview.replace(/<th>city<\/th>/gi, '<th>Villes</th>');
+            document.getElementById('df-preview').innerHTML = customPreview;
+            document.getElementById('df-info').innerHTML = `<p class="text-green-600 font-bold text-sm">✓ ${result.message}</p><p class="text-xs text-gray-500">${result.data_info.rows} lignes chargées.</p>`;
+            previewCard.classList.remove('hidden');
+            redirectContainer.classList.remove('hidden');
+            displayMessage('Données prêtes pour l\'analyse.', 'success');
+            previewCard.scrollIntoView({ behavior: 'smooth' });
         };
 
-        // --- CHARGEMENT LISTE API ---
-        document.addEventListener('DOMContentLoaded', async () => {
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const spinner = document.getElementById('upload-spinner');
+            spinner.classList.remove('hidden');
+            displayMessage('Authentification Eurosmart...', 'info');
             try {
-                const response = await fetch('/api/experiments?t=' + Date.now());
-                if (response.ok) {
-                    const experiments = await response.json();
-                    sidebarList.innerHTML = ''; 
-                    experiments.forEach(exp => {
-                        const sideItem = document.createElement('div');
-                        sideItem.className = "p-3 rounded-lg bg-black/20 hover:bg-blue-600/30 transition-colors cursor-pointer border border-white/5 flex items-center justify-between group select-none mb-2";
-                        sideItem.innerHTML = `
-                            <div class="flex flex-col text-left">
-                                <div class="text-sm font-bold text-white">${exp.City || "Inconnu"}</div>
-                                <div class="text-[10px] text-gray-400 mt-0.5 font-mono">${exp.CodeExp}</div>
-                            </div>
-                            <span class="text-white opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                        `;
-                        sideItem.addEventListener('click', (e) => {
-                            let current = codeInput.value.split(',').map(s => s.trim()).filter(s => s);
-                            if (e.ctrlKey || e.metaKey) {
-                                current.includes(exp.CodeExp) ? current = current.filter(c => c !== exp.CodeExp) : current.push(exp.CodeExp);
-                            } else {
-                                current = [exp.CodeExp];
-                            }
-                            codeInput.value = current.join(', ');
-                        });
-                        sidebarList.appendChild(sideItem);
-                    });
-                }
-            } catch (error) { console.error("Erreur liste", error); }
+                const response = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
+                const result = await response.json();
+                response.ok ? handleSuccess(result) : displayMessage(result.error, 'error');
+            } catch (err) { displayMessage('Erreur de communication.', 'error'); }
+            finally { spinner.classList.add('hidden'); }
         });
 
-        // --- SOUMISSION FORMULAIRE ---
-        toggleCityBtn.addEventListener('click', () => cityContainer.classList.toggle('hidden'));
-            
-        uploadForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // Validation basique côté client
-            const codeVal = codeInput.value.trim();
-            const fileInput = document.querySelector('input[name="local_files"]');
-            const hasFiles = fileInput.files.length > 0;
-            const username = document.querySelector('input[name="username"]').value;
-            const password = document.querySelector('input[name="password"]').value;
+        document.getElementById('file_local').addEventListener('change', (e) => {
+            document.getElementById('file-name-display').textContent = e.target.files[0] ? e.target.files[0].name : "Aucun fichier sélectionné";
+        });
 
-            if (!codeVal && !hasFiles) {
-                displayMessage('Veuillez saisir un code OU sélectionner un fichier local.', 'error');
-                return;
-            }
-            if (codeVal && (!username || !password)) {
-                displayMessage('Identifiants requis pour le téléchargement distant.', 'error');
-                return;
-            }
-            
-            const formData = new FormData(uploadForm);
-            
-            uploadBtn.disabled = true;
-            uploadText.textContent = "Traitement en cours...";
-            uploadSpinner.classList.remove('hidden');
-            displayMessage('', 'info'); 
-            previewCard.classList.add('hidden');
-            
+        document.getElementById('local-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const spinner = document.getElementById('local-spinner');
+            spinner.classList.remove('hidden');
+            displayMessage('Traitement du fichier local...', 'info');
             try {
-                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const response = await fetch('/upload', { method: 'POST', body: new FormData(e.target) });
                 const result = await response.json();
-                
-                if (response.ok) {
-                    previewDiv.innerHTML = result.preview.replace(/<th>city<\/th>/gi, '<th>Villes</th>');
-                    const cities = [...new Set(result.data_info.uploaded_files.map(f => f.city))].join(', ');
-                    infoDiv.innerHTML = `
-                        <p class="text-green-600 mb-2">✅ <strong>Villes :</strong> ${cities}</p>
-                        <p>📊 <strong>Lignes :</strong> ${result.data_info.rows} | <strong>Colonnes :</strong> ${result.data_info.columns.length}</p>
-                    `;
-                    previewCard.classList.remove('hidden'); 
-                    downloadSection.classList.remove('hidden'); // Affiche le bouton de téléchargement
-                    displayMessage(result.message, 'success');
-                } else {
-                    displayMessage(result.error, 'error');
+                response.ok ? handleSuccess(result) : displayMessage(result.error, 'error');
+            } catch (err) { displayMessage('Erreur d\'envoi.', 'error'); }
+            finally { spinner.classList.add('hidden'); }
+        });
+
+        // --- CHARGEMENT LISTE SITES AVEC DATES ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            const list = document.getElementById('sidebar-list');
+            
+            // Fonction pour formater la date YYYY-MM-DD -> DD/MM/YYYY
+            const formatDate = (dateStr) => {
+                if (!dateStr) return '...';
+                return dateStr.split(' ')[0].split('-').reverse().join('/');
+            };
+
+            try {
+                const res = await fetch('/api/experiments?t=' + Date.now());
+                if (res.ok) {
+                    const data = await res.json();
+                    list.innerHTML = '';
+                    data.forEach(exp => {
+                        const start = formatDate(exp.StartDate);
+                        const end = formatDate(exp.LastUpdate);
+
+                        const item = document.createElement('div');
+                        item.className = "p-3 rounded-xl bg-white/5 hover:bg-white/20 transition-all border border-white/10 cursor-pointer mb-3 group shadow-sm";
+                        
+                        item.innerHTML = `
+                            <div class="flex justify-between items-start mb-1">
+                                <strong class="text-white text-sm">${exp.City || "Inconnu"}</strong>
+                                <span class="text-[9px] text-blue-300 font-mono bg-blue-900/40 border border-blue-500/30 px-1.5 py-0.5 rounded-md">${exp.CodeExp}</span>
+                            </div>
+                            <div class="text-[10px] text-gray-400 group-hover:text-gray-200 transition-colors">
+                                Du <strong>${start}</strong> au <strong>${end}</strong>
+                            </div>
+                        `;
+                        
+                        item.onclick = () => { 
+                            document.getElementById('code-exp').value = exp.CodeExp; 
+                        };
+                        list.appendChild(item);
+                    });
                 }
-            } catch (error) {
-                console.error(error);
-                displayMessage('Erreur de communication avec le serveur.', 'error');
-            } finally {
-                uploadBtn.disabled = false;
-                uploadText.textContent = "CHARGER LES DONNÉES";
-                uploadSpinner.classList.add('hidden');
-            }
+            } catch (e) { list.innerHTML = '<p class="text-red-400 p-2 text-xs">⚠️ Erreur de chargement liste</p>'; }
         });
     </script>
 </body>

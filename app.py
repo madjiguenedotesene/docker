@@ -328,7 +328,22 @@ def get_city_from_coordinates(lat, lon):
     
     return None 
 
-
+def get_authenticated_session(username, password):
+    session_http = requests.Session()
+    login_url = "https://polluguard.eurosmart.fr/api/login"
+    
+    try:
+        response = session_http.post(login_url, json={
+            "username": username,
+            "password": password
+        }, timeout=10)
+        
+        if response.status_code == 200:
+            return session_http  # La session contient maintenant le cookie de connexion
+        return None
+    except Exception as e:
+        print(f"Erreur de connexion : {e}")
+        return None
 # ==============================================================================
 # 📥 ROUTE D'UPLOAD
 # ==============================================================================
@@ -339,29 +354,89 @@ def upload_data():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    # 1. Récupération des entrées
-    codes_input = request.form.get('code_exp')
-    manual_city_fallback = request.form.get('city_exp', '').strip()
+    
+    # --- OPTION A : FICHIER LOCAL ---
+    if 'file_local' in request.files and request.files['file_local'].filename != '':
+        file = request.files['file_local']
+        city_name = request.form.get('city_manual', 'Inconnu').strip() or "Local_Import"
+        
+        try:
+            filename = file.filename
+            if filename.endswith('.csv'):
+                # On tente de détecter le délimiteur automatiquement ou on utilise le standard
+                df_temp = pd.read_csv(file, sep=None, engine='python', decimal=',')
+            elif filename.endswith(('.xls', '.xlsx')):
+                df_temp = pd.read_excel(file)
+            else:
+                return jsonify({'error': 'Format de fichier non supporté (CSV ou Excel uniquement).'}), 400
+
+            if df_temp.empty:
+                return jsonify({'error': 'Le fichier est vide.'}), 400
+
+            # Nettoyage minimal des colonnes pour rester compatible avec tes scripts
+            df_temp.columns = df_temp.columns.astype(str).str.strip().str.replace(' ', '')
+            
+            # Mapping des colonnes (réutilisation de ta logique existante)
+            column_mapping = {
+                '_HR': 'Humidité', '_Temp': 'Température', '_LUM': 'Lumière', '_VOC': 'COV',
+                '_PM1': 'PM1', '_PM2': 'PM2_5', '_PM4': 'PM4', '_PM10': 'PM10',
+                '_IQA': 'IQA', '_CO2': 'CO2', '_NOX': 'NOX', '_PA': 'Pression', 'Villes' : 'city' 
+            }
+            rename_dict = {}
+            for original, new in column_mapping.items():
+                for col in df_temp.columns:
+                    if original.lower() in col.lower():
+                        rename_dict[col] = new
+                        break
+            df_temp.rename(columns=rename_dict, inplace=True)
+
+            # Gestion de la colonne temps
+            df_temp, time_col = convert_to_datetime(df_temp)
+            if time_col: 
+                session['time_col'] = time_col
+                df_temp = df_temp.sort_values(by=time_col)
+            
+            df_temp['city'] = city_name
+            
+            # Sauvegarde en session (Parquet)
+            data_filename = f'{uuid.uuid4()}.parquet'
+            file_path = os.path.join(app.config['DATA_FOLDER'], data_filename)
+            df_temp.to_parquet(file_path)
+            session['data_file'] = data_filename
+
+            return jsonify({
+                'message': 'Fichier local chargé avec succès.',
+                'data_info': {
+                    'rows': len(df_temp),
+                    'columns': list(df_temp.columns),
+                    'uploaded_files': [{'filename': filename, 'city': city_name}]
+                },
+                'preview': df_temp.head(10).to_html(classes='data-table table-striped table-bordered', index=False)
+            })
+
+        except Exception as e:
+            return jsonify({'error': f'Erreur lors de la lecture du fichier : {str(e)}'}), 500
+    
+    # 1. Récupération des entrées (Identifiants + Codes)
     username = request.form.get('username')
     password = request.form.get('password')
+    codes_input = request.form.get('code_exp')
+    manual_city_fallback = request.form.get('city_exp', '').strip()
     
-    # Récupération des fichiers locaux
-    uploaded_files = request.files.getlist('local_files')
-
-    # Vérifications
-    has_codes = codes_input and codes_input.strip()
-    has_files = len(uploaded_files) > 0 and uploaded_files[0].filename != ''
-
-    if not has_codes and not has_files:
-        return jsonify({'error': 'Veuillez entrer un code expérience OU sélectionner un fichier local.'}), 400
+    if not username or not password:
+        return jsonify({'error': 'Identifiant et mot de passe requis pour le téléchargement sécurisé.'}), 400
     
-    # Si on a des codes, on exige les identifiants
-    if has_codes and (not username or not password):
-        return jsonify({'error': 'Identifiant et mot de passe requis pour le téléchargement distant.'}), 400
+    
+    if not codes_input:
+        return jsonify({'error': 'Veuillez entrer au moins un code expérience.'}), 400
         
+    # 2. Authentification
+    auth_session = get_authenticated_session(username, password)
+    if not auth_session:
+        return jsonify({'error': 'Échec de la connexion Eurosmart. Vérifiez vos identifiants.'}), 401
+
     delimiter = ';'    
     decimal = ','
-    
     file_info_list = []
     all_data = pd.DataFrame()
     errors_log = []
@@ -372,229 +447,115 @@ def upload_files():
         '_IQA': 'IQA', '_CO2': 'CO2', '_NOX': 'NOX', '_PA': 'Pression', 'Villes' : 'city' 
     }
 
-    # ==============================================================================
-    # PARTIE A : TRAITEMENT DES FICHIERS LOCAUX
-    # ==============================================================================
-    if has_files:
-        for file in uploaded_files:
-            if file.filename == '': continue
-            
-            try:
-                # Lecture directe
-                df_temp = pd.read_csv(file, sep=delimiter, decimal=decimal, low_memory=False)
-                
-                if df_temp.empty:
-                    errors_log.append(f"Fichier local {file.filename}: Vide.")
-                    continue
+    # --- ÉTAPE API : RÉCUPÉRER LA LISTE POUR GÉO ---
+    api_experiments = []
+    try:
+        url = "https://polluguard.eurosmart.fr/get_experiments"
+        token = "IUFNIFN-9z84fSION@soi-efgzerg"
+        headers = {"Authorization": f"Bearer {token}"}
+        response = auth_session.get(url, headers=headers, timeout=5) 
+        if response.status_code == 200:
+            api_experiments = response.json()
+    except Exception as e:
+        app.logger.warning(f"API Eurosmart warning (liste géo): {e}")
 
-                # Détection Ville via le nom du fichier
-                city_name = "Inconnu"
-                filename_clean = os.path.splitext(file.filename)[0]
-                
-                if '_' in filename_clean:
-                    parts = filename_clean.split('_')
-                    if len(parts[0]) > 2: city_name = parts[0].capitalize()
-                elif '-' in filename_clean:
-                    parts = filename_clean.split('-')
-                    if len(parts[0]) > 2: city_name = parts[0].capitalize()
-                else:
-                    if len(filename_clean) > 2 and not filename_clean.isdigit():
-                        city_name = filename_clean.capitalize()
+    # --- ÉTAPE : TRAITEMENT DES CODES ---
+    normalized_input = codes_input.replace(';', ',').replace(' ', ',')
+    code_list = [c.strip() for c in normalized_input.split(',') if c.strip()]
 
-                # --- BLOC NETTOYAGE (Commun) ---
-                df_temp.columns = df_temp.columns.astype(str).str.strip().str.replace(' ', '')
+    for i, code in enumerate(code_list):
+        if i > 0: time.sleep(1.0) # Petit délai pour ne pas surcharger le serveur
 
-                rename_dict = {}
-                for original, new in column_mapping.items():
-                    for col in df_temp.columns:
-                        if original.lower() in col.lower() and col not in rename_dict.values():
-                            rename_dict[col] = new
-                            break
-                if rename_dict: df_temp.rename(columns=rename_dict, inplace=True)
-                
-                cols_to_drop = []
-                time_col_found = False
-                for col in df_temp.columns:
-                    if 'batterie' in col.lower(): cols_to_drop.append(col)
-                    elif 'temps' in col.lower():
-                        if not time_col_found:
-                            time_col_found = True
-                            df_temp.rename(columns={col: 'temps'}, inplace=True)
-                        else: cols_to_drop.append(col)
-                if cols_to_drop: df_temp = df_temp.drop(columns=cols_to_drop, errors='ignore')
-                    
-                df_temp, time_col = convert_to_datetime(df_temp)
-                if time_col: session['time_col'] = time_col
-                
-                df_temp['city'] = city_name
-            
-                for col in df_temp.columns:
-                    if pd.api.types.is_numeric_dtype(df_temp[col]):
-                        df_temp[col].fillna(df_temp[col].median(), inplace=True)
-                
-                file_info_list.append({'filename': file.filename, 'city': city_name})
-                all_data = pd.concat([all_data, df_temp], ignore_index=True)
-
-            except Exception as e:
-                app.logger.error(f"Erreur fichier local {file.filename}: {e}")
-                errors_log.append(f"{file.filename}: Erreur lecture.")
-
-    # ==============================================================================
-    # PARTIE B : TRAITEMENT DISTANT (CODES) - CORRIGÉE
-    # ==============================================================================
-    if has_codes:
-        # --- 1. CONFIGURATION SESSION ROBUSTE ---
-        session_requests = requests.Session()
-        
-        # HEADERS : On imite un navigateur pour éviter l'erreur 401
-        headers_browser = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Referer': 'https://polluguard.eurosmart.fr/',
-            'Accept': 'application/json, text/plain, */*'
-        }
-        session_requests.headers.update(headers_browser)
-
-        # --- 2. LOGIN ---
         try:
-            login_url = "https://polluguard.eurosmart.fr/api/login"
-            login_payload = {"username": username, "password": password}
+            # A. Téléchargement Sécurisé
+            download_url = f"https://polluguard.eurosmart.fr/secure_download?codeExp={code}"
+            response = auth_session.get(download_url)
             
-            # Timeout court pour le login
-            login_response = session_requests.post(login_url, json=login_payload, timeout=15)
+            if response.status_code != 200:
+                errors_log.append(f"{code}: Accès refusé ou code inexistant.")
+                continue
+
+            # Lecture du CSV depuis le flux texte reçu
+            from io import StringIO
+            df_temp = pd.read_csv(StringIO(response.text), sep=delimiter, decimal=decimal, low_memory=False)
             
-            if login_response.status_code != 200:
-                app.logger.error(f"Login Failed: {login_response.status_code} - {login_response.text}")
-                if not has_files:
-                    return jsonify({'error': 'Connexion refusée par Eurosmart. Vérifiez vos identifiants.'}), 401
-                else:
-                    errors_log.append("Connexion distante refusée (Identifiants incorrects).")
-                    has_codes = False # On continue seulement avec les fichiers locaux
-        except Exception as e:
-            app.logger.error(f"Login Exception: {e}")
-            if not has_files:
-                return jsonify({'error': f"Erreur serveur : {str(e)}"}), 500
-            errors_log.append("Erreur technique connexion distante.")
-            has_codes = False
+            if df_temp.empty:
+                 errors_log.append(f"{code}: Fichier vide.")
+                 continue
 
-        # --- 3. TÉLÉCHARGEMENT ---
-        if has_codes:
-            # Récupération Métadonnées (Géo)
-            api_experiments = []
-            try:
-                url_meta = "https://polluguard.eurosmart.fr/get_experiments"
-                resp_meta = session_requests.get(url_meta, timeout=10)
-                if resp_meta.status_code == 200:
-                    api_experiments = resp_meta.json()
-            except Exception as e:
-                app.logger.warning(f"Warning API Meta: {e}")
-
-            # Boucle sur les codes
-            normalized_input = codes_input.replace(';', ',').replace(' ', ',')
-            code_list = [c.strip() for c in normalized_input.split(',') if c.strip()]
-
-            for i, code in enumerate(code_list):
-                if i > 0: time.sleep(1) # Pause de courtoisie
-
+            # B. Détection Ville (Ta logique reste la même)
+            city_name = "Inconnu"
+            exp_info = next((item for item in api_experiments if item.get("CodeExp") == code), None)
+            
+            if exp_info and 'Latitude' in exp_info and 'Longitude' in exp_info:
                 try:
-                    download_url = "https://polluguard.eurosmart.fr/secure_download"
-                    params = {'codeExp': code}
-                    
-                    # TIMEOUT AUGMENTÉ à 120s pour éviter "Erreur réseau" sur les gros fichiers
-                    file_response = session_requests.get(download_url, params=params, timeout=120)
-                    
-                    if file_response.status_code == 200:
-                        # Vérif anti-page d'erreur HTML
-                        if 'text/html' in file_response.headers.get('Content-Type', ''):
-                            errors_log.append(f"{code}: Erreur droits (HTML reçu).")
-                            continue
+                    detected_city = get_city_from_coordinates(exp_info['Latitude'], exp_info['Longitude'])
+                    if detected_city: city_name = detected_city
+                except Exception: pass
+            
+            if city_name == "Inconnu" and '_' in code:
+                parts = code.split('_')
+                if len(parts[0]) > 2 and not parts[0].isdigit():
+                    city_name = parts[0].capitalize()
+            
+            if city_name == "Inconnu" and manual_city_fallback:
+                city_name = manual_city_fallback
+            
+            if city_name == "Inconnu":
+                city_name = f"Exp_{code}"
 
-                        csv_content = io.StringIO(file_response.text)
-                        df_temp = pd.read_csv(csv_content, sep=delimiter, decimal=decimal, low_memory=False)
-                    
-                    elif file_response.status_code == 401:
-                        errors_log.append(f"{code}: Session expirée (401).")
-                        continue
-                    elif file_response.status_code == 404:
-                        errors_log.append(f"{code}: Introuvable.")
-                        continue
-                    else:
-                        errors_log.append(f"{code}: Erreur HTTP {file_response.status_code}")
-                        continue
-                    
-                    if df_temp.empty:
-                        errors_log.append(f"{code}: Fichier vide.")
-                        continue
+            # C. Nettoyage et Mapping (Ta logique reste la même)
+            df_temp.columns = df_temp.columns.astype(str).str.strip().str.replace(' ', '')
+            rename_dict = {}
+            for original, new in column_mapping.items():
+                for col in df_temp.columns:
+                    if original.lower() in col.lower() and col not in rename_dict.values():
+                        rename_dict[col] = new
+                        break
+            if rename_dict: df_temp.rename(columns=rename_dict, inplace=True)
+            
+            cols_to_drop = []
+            time_col_found = False
+            for col in df_temp.columns:
+                if 'batterie' in col.lower(): cols_to_drop.append(col)
+                elif 'temps' in col.lower():
+                    if not time_col_found:
+                        time_col_found = True
+                        df_temp.rename(columns={col: 'temps'}, inplace=True)
+                    else: cols_to_drop.append(col)
+            if cols_to_drop: df_temp = df_temp.drop(columns=cols_to_drop, errors='ignore')
+                
+            df_temp, time_col = convert_to_datetime(df_temp)
+            if time_col: session['time_col'] = time_col
+            
+            df_temp['city'] = city_name
+            
+            for col in df_temp.columns:
+                if pd.api.types.is_numeric_dtype(df_temp[col]):
+                    df_temp[col].fillna(df_temp[col].median(), inplace=True)
 
-                    # Détection Ville
-                    city_name = "Inconnu"
-                    exp_info = next((item for item in api_experiments if item.get("CodeExp") == code), None)
-                    if exp_info and 'Latitude' in exp_info:
-                        try:
-                            detected_city = get_city_from_coordinates(exp_info['Latitude'], exp_info['Longitude'])
-                            if detected_city: city_name = detected_city
-                        except: pass
-                    
-                    if city_name == "Inconnu" and '_' in code:
-                        parts = code.split('_')
-                        if len(parts[0]) > 2 and not parts[0].isdigit(): city_name = parts[0].capitalize()
-                    
-                    if city_name == "Inconnu" and manual_city_fallback: city_name = manual_city_fallback
-                    if city_name == "Inconnu": city_name = f"Exp_{code}"
+            file_info_list.append({'filename': code, 'city': city_name})
+            all_data = pd.concat([all_data, df_temp], ignore_index=True)
 
-                    # --- BLOC NETTOYAGE (Identique) ---
-                    df_temp.columns = df_temp.columns.astype(str).str.strip().str.replace(' ', '')
-                    rename_dict = {}
-                    for original, new in column_mapping.items():
-                        for col in df_temp.columns:
-                            if original.lower() in col.lower() and col not in rename_dict.values():
-                                rename_dict[col] = new
-                                break
-                    if rename_dict: df_temp.rename(columns=rename_dict, inplace=True)
-                    
-                    cols_to_drop = []
-                    time_col_found = False
-                    for col in df_temp.columns:
-                        if 'batterie' in col.lower(): cols_to_drop.append(col)
-                        elif 'temps' in col.lower():
-                            if not time_col_found:
-                                time_col_found = True
-                                df_temp.rename(columns={col: 'temps'}, inplace=True)
-                            else: cols_to_drop.append(col)
-                    if cols_to_drop: df_temp = df_temp.drop(columns=cols_to_drop, errors='ignore')
-                        
-                    df_temp, time_col = convert_to_datetime(df_temp)
-                    if time_col: session['time_col'] = time_col
-                    
-                    df_temp['city'] = city_name
-                    for col in df_temp.columns:
-                        if pd.api.types.is_numeric_dtype(df_temp[col]):
-                            df_temp[col].fillna(df_temp[col].median(), inplace=True)
-                    
-                    file_info_list.append({'filename': code, 'city': city_name})
-                    all_data = pd.concat([all_data, df_temp], ignore_index=True)
-
-                except Exception as e:
-                    app.logger.error(f"CRASH code {code}: {e}")
-                    errors_log.append(f"{code}: Erreur technique.")
-
-    # --- 4. RETOUR FINAL ---
+        except Exception as e:
+            app.logger.error(f"Erreur sur le code {code}: {e}")
+            errors_log.append(f"{code}: Erreur interne ({str(e)}).")
+            
+    # --- 3. SAUVEGARDE ET APERÇU ---
     if all_data.empty:  
-        msg = "Échec du chargement. Aucune donnée récupérée."
+        msg = "Échec du chargement."
         if errors_log: msg += " Détails : " + " | ".join(errors_log)
         return jsonify({'error': msg}), 400
             
-    # Sauvegarde Parquet
     data_filename = f'{uuid.uuid4()}.parquet'
     file_path = os.path.join(app.config['DATA_FOLDER'], data_filename)
     all_data.to_parquet(file_path)
     session['data_file'] = data_filename
     
-    # Aperçu Intelligent
     try:
         preview_df = all_data.groupby('city', sort=False).head(5).reset_index(drop=True)
         preview_html = preview_df.to_html(classes='data-table table-striped table-bordered', index=False)
-    except Exception as e:
-        app.logger.error(f"Erreur aperçu: {e}")
+    except Exception:
         preview_html = all_data.head(10).to_html(classes='data-table table-striped table-bordered')
 
     info = {        
@@ -604,7 +565,7 @@ def upload_files():
         'uploaded_files': file_info_list
     }
     
-    msg = 'Données chargées avec succès.'
+    msg = 'Données téléchargées et chargées avec succès.'
     if errors_log: msg += " (Attention: " + ", ".join(errors_log) + ")"
     
     return jsonify({'message': msg, 'data_info': info, 'preview': preview_html})
