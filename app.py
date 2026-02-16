@@ -742,158 +742,154 @@ def get_daily_dew_point_averages():
 def visualizations():
     return render_template('visualizations.html')
 
+
+# ==============================================================================
+# 🧠 MAPPING INTELLIGENT (Colonne FR -> Logique EN)
+# ==============================================================================
+# Permet de deviner quel jeu de seuils appliquer selon le nom de la colonne
+AUTO_CATEGORY_MAP = {
+    'Température': 'temperature',
+    'Humidité': 'humidity',
+    'COV': 'cov',
+    'IQA': 'iqa',
+    'PM': 'pm',       # Matchera PM1, PM2_5, PM10
+    'CO2': 'co2',
+    'NOX': 'nox',
+    'Lumière': 'light'
+}
+
 @app.route('/generate_plot', methods=['POST'])
 def generate_plot():
     df = get_df_from_session()
     if df is None:
         return jsonify({'error': 'Aucune donnée chargée en session.'}), 400
     
-    plot_type = request.json.get('plotType')
-    x_col = request.json.get('xCol')
-    y_col = request.json.get('yCol')
-    color_col = request.json.get('colorCol')
-    color_type = request.json.get('colorType')
-    city = request.json.get('city')
-
-    if color_col == "":
-        color_col = None
-        color_type = None
+    req = request.json
+    plot_type = req.get('plotType')
+    x_col = req.get('xCol')
+    y_col = req.get('yCol')
+    color_col = req.get('colorCol')
+    city = req.get('city')
+    
+    # Nettoyage entrées vides
+    if x_col == "": x_col = None
+    if y_col == "": y_col = None
+    if color_col == "": color_col = None
 
     temp_df = df.copy()
 
-    # ==============================================================================
-    # 1. NETTOYAGE TEMPOREL (Uniquement pour 'line' et 'bar')
-    # ==============================================================================
-    is_time_series = False 
+    # 1. FILTRAGE VILLE
+    if city and 'city' in temp_df.columns:
+        temp_df = temp_df[temp_df['city'] == city]
+        if temp_df.empty: return jsonify({'error': f"Pas de données pour {city}"}), 400
 
-    # On applique le traitement SI c'est une LIGNE ou une BARRE
+    # 2. GESTION INTELLIGENTE DES CATÉGORIES / COULEURS
+    # Le JS envoie "Température" dans color_col. On doit deviner que c'est le type 'temperature'.
+    category_orders = {}
+    color_map = None
+    
+    if color_col:
+        # Déduction automatique du type de seuil (ex: "Température" -> "temperature")
+        found_type = None
+        for fr_key, en_key in AUTO_CATEGORY_MAP.items():
+            if fr_key in color_col: # Si "PM" est dans "PM2_5", on prend "pm"
+                found_type = en_key
+                break
+        
+        # Si on a trouvé un type connu, on transforme la colonne numérique en catégories
+        if found_type:
+            try:
+                # On appelle VOTRE fonction qui crée la colonne _category
+                temp_df, new_col, color_map, ordered_cats = create_color_categories(temp_df, color_col, found_type)
+                
+                # IMPORTANT : On remplace la colonne cible par la version catégorielle
+                # Pour un Pie chart ou une coloration, on veut les catégories (Chaud/Froid), pas les chiffres.
+                color_col = new_col 
+                category_orders[color_col] = ordered_cats
+            except Exception as e:
+                app.logger.error(f"Erreur catégorisation: {e}")
+
+    # 3. PRÉPARATION TEMPORELLE (Uniquement pour Line/Bar)
+    is_time_series = False
     if plot_type in ['line', 'bar']:
-        if x_col in temp_df.columns:
-            # 1. Conversion forcée en date
+        if x_col and x_col in temp_df.columns:
             temp_df[x_col] = pd.to_datetime(temp_df[x_col], errors='coerce')
-            temp_df = temp_df.dropna(subset=[x_col])
-            
-            # 2. Tri chronologique (Indispensable pour l'axe temporel)
-            temp_df = temp_df.sort_values(by=x_col)
-            
-            # 3. Suppression des doublons (Le fix du "200%")
-            if 'city' in temp_df.columns:
-                temp_df = temp_df.drop_duplicates(subset=[x_col, 'city'], keep='last')
-            else:
-                temp_df = temp_df.drop_duplicates(subset=[x_col], keep='last')
-            
+            temp_df = temp_df.sort_values(x_col)
             is_time_series = True
 
-    # ==============================================================================
-    # 2. FILTRAGE PAR VILLE
-    # ==============================================================================
-    if city:
-        if 'city' not in temp_df.columns:
-            return jsonify({'error': "La colonne 'city' est introuvable."}), 400
-        
-        temp_df = temp_df[temp_df['city'] == city]
-        
-        if temp_df.empty:
-            return jsonify({'error': f"Aucune donnée trouvée pour la ville sélectionnée ({city})."}), 400
-
-    # ==============================================================================
-    # 3. GESTION DES COULEURS
-    # ==============================================================================
-    color_map = None
-    category_orders = {}
-
-    if color_col and color_type:
-        try:
-            temp_df, new_color_col, color_map, ordered_categories = create_color_categories(temp_df, color_col, color_type)
-            color_col = new_color_col
-            category_orders[color_col] = ordered_categories
-        except Exception as e:
-            app.logger.error(f"Erreur couleur: {str(e)}")
-
-    # Vérifications colonnes
-    if x_col not in temp_df.columns:
-        return jsonify({'error': f"La colonne '{x_col}' est introuvable."}), 400
-    if y_col and y_col not in temp_df.columns:
-        return jsonify({'error': f"La colonne '{y_col}' est introuvable."}), 400
-
-    # ==============================================================================
     # 4. GÉNÉRATION DES GRAPHIQUES
-    # ==============================================================================
     try:
         common_args = {
             'color_discrete_map': color_map,
-            'category_orders': category_orders,
+            'category_orders': category_orders
         }
-        
+
+        fig = None
+
         if plot_type == 'scatter':
+            # Nuage de points : X=Num, Y=Num, Color=Catégorie
             fig = px.scatter(temp_df, x=x_col, y=y_col, color=color_col, **common_args)
-        
+
         elif plot_type == 'bar':
-            # Maintenant temp_df est trié et nettoyé, donc pas de doublons empilés
+            # Barres : X=Temps, Y=Num, Color=Catégorie
             fig = px.bar(temp_df, x=x_col, y=y_col, color=color_col, barmode='group', **common_args)
-            
+
         elif plot_type == 'line':
-            if city:
-                 fig = px.line(temp_df, x=x_col, y=y_col, **common_args)
-            else:
-                 fig = px.line(temp_df, x=x_col, y=y_col, color='city')
-        
+            # Ligne : X=Temps, Y=Num, Color=Catégorie ou Ville
+            color_target = color_col if color_col else ('city' if not city and 'city' in temp_df.columns else None)
+            fig = px.line(temp_df, x=x_col, y=y_col, color=color_target, **common_args)
+
         elif plot_type == 'pie':
-            if color_col:
-                counts = temp_df.groupby(color_col, observed=True).size().reset_index(name='count')
-                fig = px.pie(counts, values='count', names=color_col, color=color_col, **common_args)
-            else:
-                counts = temp_df[x_col].value_counts().reset_index()
-                counts.columns = ['Category', 'Count']
-                fig = px.pie(counts, values='Count', names='Category')
+            # Cible : La colonne de couleur (ex: Température_category) ou la Ville
+            target = color_col if color_col else 'city'
             
+            # Agrégation
+            counts = temp_df[target].value_counts().reset_index()
+            counts.columns = [target, 'count']
+            
+            # Si on a une color_map (ex: Température), on force les couleurs
+            if color_map:
+                fig = px.pie(counts, values='count', names=target, color=target, **common_args)
+            else:
+                # Sinon (ex: Ville), on laisse Plotly choisir les couleurs
+                fig = px.pie(counts, values='count', names=target)
+            
+            fig.update_traces(textinfo='percent+label')
+
         elif plot_type == 'box':
-            if y_col:
-                fig = px.box(temp_df, x=x_col, y=y_col, color=color_col, **common_args)
+    
+            if color_col:
+                fig = px.box(temp_df, x=color_col, y=y_col, color=color_col, **common_args)
             else:
-                fig = px.box(temp_df, x=color_col, y=x_col, color=color_col, **common_args)
-            
-            # Vérif numérique
-            val_col = y_col if y_col else x_col
-            if not is_numeric_or_datetime(temp_df[val_col]):
-                 return jsonify({'error': "La colonne de valeur doit être numérique."}), 400
-        
+                temp_df[' _'] = 'Distribution Globale'
+                fig = px.box(temp_df, x=' _', y=y_col, **common_args)
+                
+            fig.update_layout(xaxis_title="")
+
         elif plot_type == 'distribution_histogram':
-            fig = px.histogram(temp_df, x=x_col, color=color_col, marginal='box', **common_args)
-        
+            
+            target_val = x_col if x_col else y_col
+            fig = px.histogram(temp_df, x=target_val, color=color_col, marginal="box", **common_args)
+
+        # Mise en page finale
+        if fig:
+            fig.update_layout(
+                template="plotly_white",
+                margin=dict(l=20, r=20, t=40, b=20),
+                legend_title_text="" 
+            )
+           
+            if is_time_series:
+                fig.update_layout(xaxis=dict(rangeslider=dict(visible=True), type="date"))
+            
+            return jsonify({'plot_json': fig.to_json()})
         else:
-            return jsonify({'error': 'Type de graphique non pris en charge.'}), 400
-            
-        # Mise en page légende
-        if color_col:
-            fig.update_layout(
-                legend_title_text=color_col.replace('_category', '').replace('_', ' '),
-                legend={'traceorder': 'normal'}
-            )
-            
-        # -------------------------------------------------------------------
-        # Activation du slider temporel (Uniquement si 'line' ou 'bar' activé plus haut)
-        # -------------------------------------------------------------------
-        if is_time_series:
-            fig.update_layout(
-                xaxis=dict(
-                    type="date", # Force l'axe X en mode DATE (gère les trous temporels)
-                    rangeselector=dict(
-                        buttons=list([
-                            dict(count=1, label="1h", step="hour", stepmode="backward"),
-                            dict(count=1, label="1j", step="day", stepmode="backward"),
-                            dict(step="all", label="Tout")
-                        ])
-                    ),
-                    rangeslider=dict(visible=True)
-                )
-            )
-        
-        return jsonify({'plot_json': fig.to_json()})
+             return jsonify({'error': "Type de graphique inconnu"}), 400
 
     except Exception as e:
-        app.logger.error(f"Erreur plot: {str(e)}")
-        return jsonify({'error': f"Erreur technique : {str(e)}"}), 500
+        app.logger.error(f"Plot Error: {e}")
+        return jsonify({'error': f"Erreur génération : {str(e)}"}), 500
+
 # ==============================================================================
 # 🎨 PAGE PREDICTION
 # ==============================================================================
@@ -1508,5 +1504,6 @@ def analyze_peaks():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)

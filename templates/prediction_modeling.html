@@ -74,16 +74,21 @@
             <div class="main-card p-2 bg-white rounded-2xl shadow-xl overflow-hidden">
                 <div id="prediction-plot"></div>
             </div>
-
+             <div class="table-preview overflow-x-auto"><div id="df-preview"></div></div>
+                <div id="redirect-btn-container" class="mt-8 flex justify-center hidden">
+                    <a href="/comparaison" class="btn-gradient px-10 py-4 text-lg">comparaison →</a>
+                </div>
+            </div>
         </div>
+        
 
     </main>
      <footer class="footer-transparent text-gray-400 p-6 mt-8 text-center">
         <div class="container mx-auto flex flex-wrap justify-center gap-6">
             <a href="/" class="nav-link">✨ Accueil</a>
             <a href="/upload-data" class="nav-link">📁 Chargement</a>
-            <a href="/prediction-modeling" class="nav-link">🔮 Prédiction</a>
             <a href="/visualizations" class="nav-link">📈 Visualisation</a>
+            <a href="/prediction-modeling" class="nav-link">🔮 Prédiction</a>
             <a href="/comparaison" class="nav-link">🌐 Comparaison</a>
         </div>
     </footer>
@@ -103,6 +108,7 @@
         const msgContainer = document.getElementById('message-container');
         const resultsSection = document.getElementById('results-section');
         const metricsGrid = document.getElementById('metrics-grid');
+        const redirectContainer = document.getElementById('redirect-btn-container');
 
         // --- INIT ---
         document.addEventListener('DOMContentLoaded', async () => {
@@ -179,6 +185,7 @@
         // --- RENDER ---
         function renderResults(data) {
             resultsSection.classList.remove('hidden');
+            redirectContainer.classList.remove('hidden');
             metricsGrid.innerHTML = '';
             
             const results = data.results;

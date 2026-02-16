@@ -26,7 +26,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Override spécifique pour correspondre au style bouton "Analyse" */
         .btn-gradient {
             background: linear-gradient(135deg, #a742b7, #4b52ff, #ff69b4);
             color: white;
@@ -56,14 +55,21 @@
     </nav>
 
     <main class="container mx-auto p-4 md:p-8 flex-grow mb-20 mt-20"> 
-``` <h1 class="text-3xl md:text-4xl font-extrabold mb-8 text-white text-center">Visualisation des Données</h1> <div id="selection-card" class="main-card p-6 md:p-10 text-center max-w-[95%] mx-auto bg-white rounded-[2rem]"> <h2 class="text-2xl font-bold mb-8 text-gray-800">Configuration du Graphique</h2> <form id="plot-form" class="space-y-8"> <div class="grid grid-cols-1 md:grid-cols-2 gap-8"> <div class="text-left"> <label for="plotType" class="block text-gray-700 font-bold mb-2 ml-1">Type de Graphique</label> ```
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-8 text-white text-center">Visualisation des Données</h1>
+        
+        <div id="selection-card" class="main-card p-6 md:p-10 text-center max-w-[95%] mx-auto bg-white rounded-[2rem]">
+            <h2 class="text-2xl font-bold mb-8 text-gray-800">Configuration du Graphique</h2>
+            <form id="plot-form" class="space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="text-left">
+                        <label for="plotType" class="block text-gray-700 font-bold mb-2 ml-1">Type de Graphique</label>
                         <select id="plotType" name="plotType" class="w-full p-4 border-2 border-gray-100 rounded-2xl focus:border-purple-500 outline-none bg-gray-50 text-gray-700">
                             <option value="line">Lignes</option>
                             <option value="bar">Barres</option>
                             <option value="scatter">Nuage de points</option>
-                            <option value="box">Boîte à moustaches</option>
+                            <option value="pie">Secteurs (Répartition)</option>
                             <option value="distribution_histogram">Histogramme</option>
-                            <option value="pie">Secteurs</option>
+                            <option value="box">Boîte à moustaches</option>
                         </select>
                     </div>
                     <div id="x-col-container" class="text-left">
@@ -81,7 +87,7 @@
                         <label for="colorCol" class="block text-gray-700 font-bold mb-2 ml-1">Colorer par</label>
                         <select id="colorCol" name="colorCol" class="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-purple-500 outline-none bg-gray-50 text-gray-700"></select>
                     </div>
-                    <div id="color-type-container" class="text-left">
+                    <div id="color-type-container" class="text-left hidden">
                         <label for="colorType" class="block text-gray-700 font-bold mb-2 ml-1">Seuils</label>
                         <select id="colorType" name="colorType" class="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-purple-500 outline-none bg-gray-50 text-gray-700"></select>
                     </div>
@@ -113,7 +119,6 @@
                 </button>
             </div>
 
-
             <div id="analysis-results" class="mt-12 text-left w-full hidden space-y-8 animate-fade-in-up"></div>
 
             <div id="redirect-btn-container" class="mt-12 pt-8 border-t border-gray-100 flex flex-wrap justify-center gap-4 hidden">
@@ -127,176 +132,271 @@
         <div class="container mx-auto flex flex-wrap justify-center gap-6">
             <a href="/" class="nav-link">✨ Accueil</a>
             <a href="/upload-data" class="nav-link">📁 Chargement</a>
-            <a href="/prediction-modeling" class="nav-link">🔮 Prédiction</a>
             <a href="/visualizations" class="nav-link">📈 Visualisation</a>
+            <a href="/prediction-modeling" class="nav-link">🔮 Prédiction</a>
             <a href="/comparaison" class="nav-link">🌐 Comparaison</a>
         </div>
     </footer>
 
     <script>
-        // Logique JS (identique à la tienne, simplifiée pour les messages)
-        const messageContainer = document.getElementById('message-container');
-        const plotForm = document.getElementById('plot-form');
-        const plotContainer = document.getElementById('plot-container');
-        const xColSelect = document.getElementById('xCol');
-        const yColSelect = document.getElementById('yCol');
-        const colorColSelect = document.getElementById('colorCol');
-        const colorTypeSelect = document.getElementById('colorType');
-        const plotTypeSelect = document.getElementById('plotType');
-        const cityFilterSelect = document.getElementById('city-filter');
-        const redirectBtnContainer = document.getElementById('redirect-btn-container');
-        const downloadPlotBtn = document.getElementById('downloadPlotBtn');
-        const analysisBtnContainer = document.getElementById('analysis-trigger-container');
-        const analysisBtn = document.getElementById('trigger-analysis-btn');
-        const analysisResults = document.getElementById('analysis-results');
-        
-        let allColumns = []; 
-        let timeColumns = []; 
-        let currentPollutant = null;
+    // ==========================================
+    // 1. RÉFÉRENCES DOM
+    // ==========================================
+    const plotForm = document.getElementById('plot-form');
+    const messageContainer = document.getElementById('message-container');
+    const plotContainer = document.getElementById('plot-container');
+    const plotCard = document.getElementById('plot-card');
+    const plotTypeSelect = document.getElementById('plotType');
+    const xColSelect = document.getElementById('xCol');
+    const yColSelect = document.getElementById('yCol');
+    const colorColSelect = document.getElementById('colorCol');
+    const cityFilterSelect = document.getElementById('city-filter');
+    const xContainer = document.getElementById('x-col-container');
+    const yContainer = document.getElementById('y-col-container');
+    const colorContainer = document.getElementById('color-col-container');
+    const thresholdContainer = document.getElementById('color-type-container');
+    const redirectBtnContainer = document.getElementById('redirect-btn-container');
+    const downloadPlotBtn = document.getElementById('downloadPlotBtn');
+    const analysisBtnContainer = document.getElementById('analysis-trigger-container');
+    const analysisBtn = document.getElementById('trigger-analysis-btn');
+    const analysisResults = document.getElementById('analysis-results');
 
-        const columnTypeMapping = {
-            'temp': { value: 'temperature', text: 'Température' }, 
-            'hum': { value: 'humidity', text: 'Humidité' }, 
-            'cov': { value: 'cov', text: 'Qualité Air (COV)' },
-            'pm': { value: 'pm', text: 'Particules Fines' },
-            'co2': { value: 'co2', text: 'Dioxyde de Carbone' }
-        };
+    let allColumns = [], timeColumns = [], currentPollutant = null;
 
-        const runAnalysis = async () => {
-            if (!currentPollutant) return;
-            analysisResults.classList.remove('hidden');
-            analysisResults.innerHTML = `
-                <div class="flex flex-col items-center justify-center p-12">
-                    <div class="loading-spinner mb-4"></div>
-                    <p class="text-purple-600 font-bold animate-pulse">L'IA déchiffre vos données...</p>
-                </div>`;
+    // ==========================================
+    // 2. FONCTIONS DE CHARGEMENT ET FORMULAIRE
+    // ==========================================
+    const populateSelect = (select, options, includeEmpty = false, emptyText = 'Toutes') => {
+        select.innerHTML = '';
+        if (includeEmpty) {
+            const opt = document.createElement('option');
+            opt.value = ""; opt.textContent = emptyText;
+            select.appendChild(opt);
+        }
+        options.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o; opt.textContent = o;
+            select.appendChild(opt);
+        });
+    };
+
+    const updateFormOptions = () => {
+        const mode = plotTypeSelect.value;
+        const xLabel = xContainer.querySelector('label');
+        const yLabel = yContainer.querySelector('label');
+        const colorLabel = colorContainer.querySelector('label');
+
+        xContainer.classList.add('hidden');
+        yContainer.classList.add('hidden');
+        colorContainer.classList.add('hidden');
+        thresholdContainer.classList.add('hidden');
+
+        xColSelect.disabled = false;
+        const numericCols = allColumns.filter(c => !timeColumns.includes(c));
+        const allColsNoTime = allColumns.filter(c => !timeColumns.includes(c));
+
+        if (mode === 'line' || mode === 'bar') {
+            xContainer.classList.remove('hidden');
+            yContainer.classList.remove('hidden');
+            colorContainer.classList.remove('hidden');
+            xLabel.textContent = "Axe Temporel";
+            yLabel.textContent = "Valeur à suivre";
+            colorLabel.textContent = "Grouper par";
+            populateSelect(xColSelect, timeColumns.length ? [timeColumns[0]] : ["Auto"]);
+            xColSelect.disabled = true;
+            populateSelect(yColSelect, numericCols);
+            populateSelect(colorColSelect, ["", ...allColsNoTime]);
+        } else if (mode === 'scatter') {
+            xContainer.classList.remove('hidden');
+            yContainer.classList.remove('hidden');
+            colorContainer.classList.remove('hidden');
+            xLabel.textContent = "Axe X";
+            yLabel.textContent = "Axe Y";
+            populateSelect(xColSelect, numericCols);
+            populateSelect(yColSelect, numericCols);
+            if (numericCols.length > 1) yColSelect.selectedIndex = 1;
+            populateSelect(colorColSelect, ["", ...allColsNoTime]);
+        } else if (mode === 'pie') {
+            colorContainer.classList.remove('hidden');
+            colorLabel.textContent = "Variable à analyser (Secteurs)";
+            populateSelect(colorColSelect, allColsNoTime);
+        } else if (mode === 'distribution_histogram') {
+            yContainer.classList.remove('hidden');
+            colorContainer.classList.remove('hidden');
+            yLabel.textContent = "Variable à analyser";
+            colorLabel.textContent = "Grouper par";
+            populateSelect(yColSelect, numericCols);
+            populateSelect(colorColSelect, ["", "city"]);
+        } else if (mode === 'box') {
+            yContainer.classList.remove('hidden');
+            colorContainer.classList.remove('hidden');
+            yLabel.textContent = "Variable à analyser";
+            colorLabel.textContent = "Grouper par (Axe X)";
+            populateSelect(yColSelect, numericCols);
+            populateSelect(colorColSelect, allColsNoTime);
+            if(allColsNoTime.includes('city')) colorColSelect.value = 'city';
+        }
+    };
+
+    const fetchInfo = async () => {
+        const res = await fetch('/get_data_info');
+        const data = await res.json();
+        allColumns = data.data_info.columns;
+        timeColumns = allColumns.filter(c => ['date','heure','time','temps'].some(k=>c.toLowerCase().includes(k)));
+        updateFormOptions();
+    };
+    
+    const fetchCities = async () => {
+        const res = await fetch('/get_unique_cities');
+        const data = await res.json();
+        cityFilterSelect.innerHTML = '<option value="">Toutes</option>';
+        data.cities.forEach(c => cityFilterSelect.add(new Option(c, c)));
+    };
+
+    // ==========================================
+    // 3. GÉNÉRATION DU GRAPHIQUE
+    // ==========================================
+    plotForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        plotCard.classList.remove('hidden');
+        messageContainer.innerHTML = '<div class="loading-spinner mx-auto"></div>';
+        analysisResults.classList.add('hidden');
+        analysisBtnContainer.classList.add('hidden');
+
+        const mode = plotTypeSelect.value;
+        let finalX = xColSelect.value;
+        let finalY = yColSelect.value;
+        let finalColor = colorColSelect.value;
+
+        if (mode === 'distribution_histogram') { finalX = yColSelect.value; finalY = null; }
+        else if (mode === 'pie') { finalX = null; }
+
+        try {
+            const res = await fetch('/generate_plot', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    plotType: mode,
+                    xCol: finalX,
+                    yCol: finalY,
+                    colorCol: finalColor,
+                    city: cityFilterSelect.value
+                })
+            });
+            const data = await res.json();
             
-            try {
-                const response = await fetch('/analyze_peaks', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ pollutant: currentPollutant })
-                });
-                const data = await response.json();
-                if(data.error) throw new Error(data.error);
+            messageContainer.innerHTML = '';
+            if (res.ok) {
+                const fig = JSON.parse(data.plot_json);
+                Plotly.newPlot('plot-container', fig.data, fig.layout, {responsive: true});
+                redirectBtnContainer.classList.remove('hidden');
                 
-                let html = '';
-                if (data.knowledge && data.knowledge.desc) {
-                    html += `
-                        <div class="bg-white rounded-[2rem] shadow-xl p-8 border border-purple-50 mb-8 relative">
-                            <h3 class="text-2xl font-bold text-purple-800 mb-4 flex items-center">🔍 ${data.pollutant}</h3>
-                            <p class="text-gray-600 text-lg leading-relaxed mb-6">${data.knowledge.desc}</p>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="bg-rose-50 p-6 rounded-2xl"><b class="text-rose-600">Hausse :</b> ${data.knowledge.hausse}</div>
-                                <div class="bg-emerald-50 p-6 rounded-2xl"><b class="text-emerald-600">Baisse :</b> ${data.knowledge.baisse}</div>
-                            </div>
-                        </div>`;
+                if(finalY && mode !== 'pie') {
+                    currentPollutant = finalY;
+                    analysisBtnContainer.classList.remove('hidden');
                 }
+            } else {
+                messageContainer.innerHTML = `<p class="text-red-500">${data.error}</p>`;
+            }
+        } catch (e) { messageContainer.innerHTML = `<p class="text-red-500">${e}</p>`; }
+    });
 
-                Object.keys(data.analysis).forEach(cityName => {
-                    const cityData = data.analysis[cityName];
+    // ==========================================
+    // 4. ANALYSE IA (ADAPTÉE AU BACKEND)
+    // ==========================================
+    const runAnalysis = async () => {
+        if (!currentPollutant) return;
+
+        analysisResults.classList.remove('hidden');
+        analysisResults.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-12">
+                <div class="loading-spinner mb-4"></div>
+                <p class="text-purple-600 font-bold animate-pulse">L'IA déchiffre vos données...</p>
+            </div>
+        `;
+
+        try {
+            const response = await fetch('/analyze_peaks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pollutant: currentPollutant })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            let html = '';
+
+            // Section 1 : Connaissance
+            if (data.knowledge && data.knowledge.desc) {
+                html += `
+                    <div class="bg-white rounded-[2rem] shadow-xl p-8 border border-purple-50 mb-8 animate-fade-in-up">
+                        <h3 class="text-2xl font-bold text-purple-800 mb-4">🔍 ${data.pollutant}</h3>
+                        <p class="text-gray-600 text-lg leading-relaxed mb-6">${data.knowledge.desc}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-rose-50 p-6 rounded-2xl"><b class="text-rose-600">Hausse :</b> ${data.knowledge.hausse}</div>
+                            <div class="bg-emerald-50 p-6 rounded-2xl"><b class="text-emerald-600">Baisse :</b> ${data.knowledge.baisse}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Section 2 : Analyse par ville (Mappage direct sur les clés Python)
+            if (data.analysis) {
+                Object.keys(data.analysis).forEach(nomVille => {
+                    const v = data.analysis[nomVille];
                     html += `
-                        <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden mb-8 border border-gray-100">
+                        <div class="bg-white rounded-[2rem] shadow-xl overflow-hidden mb-8 border border-gray-100 animate-fade-in-up">
                             <div class="bg-gray-900 p-6 text-white flex justify-between items-center">
-                                <h4 class="text-2xl font-bold uppercase tracking-wider">${cityName}</h4>
+                                <h4 class="text-2xl font-bold uppercase tracking-wider">${nomVille}</h4>
                                 <div class="text-right">
                                     <span class="text-xs text-gray-400 block">Moyenne</span>
-                                    <span class="text-2xl font-mono">${cityData.stats.avg}</span>
+                                    <span class="text-2xl font-mono">${v.stats.avg}</span>
                                 </div>
                             </div>
                             <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div class="space-y-4">
                                     <h5 class="font-bold text-rose-500">📈 Épisodes de Pics</h5>
-                                    ${cityData.peaks.map(p => `<div class="p-4 bg-rose-50 rounded-2xl text-sm"><b>${p.time}</b> : ${p.explanation}</div>`).join('')}
+                                    ${v.peaks.map(p => `
+                                        <div class="p-4 bg-rose-50 rounded-2xl text-sm">
+                                            <b>${p.time}</b> (Val: ${p.value}) : <br>${p.explanation}
+                                        </div>
+                                    `).join('')}
                                 </div>
                                 <div class="space-y-4">
                                     <h5 class="font-bold text-emerald-500">📉 Points de Baisse</h5>
-                                    ${cityData.troughs.map(t => `<div class="p-4 bg-emerald-50 rounded-2xl text-sm"><b>${t.time}</b> : ${t.explanation}</div>`).join('')}
+                                    ${v.troughs.map(t => `
+                                        <div class="p-4 bg-emerald-50 rounded-2xl text-sm">
+                                            <b>${t.time}</b> (Val: ${t.value}) : <br>${t.explanation}
+                                        </div>
+                                    `).join('')}
                                 </div>
                             </div>
-                        </div>`;
+                        </div>
+                    `;
                 });
-                analysisResults.innerHTML = html;
-            } catch (e) {
-                analysisResults.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-xl">Analyse indisponible pour ce capteur.</div>`;
             }
-        };
 
-        analysisBtn.addEventListener('click', runAnalysis);
+            analysisResults.innerHTML = html;
+            analysisResults.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-        // --- FETCH & UI ---
-        const populateSelect = (select, options, includeEmpty = false, emptyText = 'Toutes') => {
-            select.innerHTML = '';
-            if (includeEmpty) {
-                const opt = document.createElement('option');
-                opt.value = ""; opt.textContent = emptyText;
-                select.appendChild(opt);
-            }
-            options.forEach(o => {
-                const opt = document.createElement('option');
-                opt.value = o; opt.textContent = o;
-                select.appendChild(opt);
-            });
-        };
+        } catch (e) {
+            console.error(e);
+            analysisResults.innerHTML = `
+                <div class="p-8 bg-red-50 text-red-600 rounded-[2rem] text-center border-2 border-red-100">
+                    <p class="font-bold text-xl mb-2">⚠️ Analyse indisponible</p>
+                    <p>Une erreur est survenue lors de la récupération de l'analyse IA.</p>
+                </div>`;
+        }
+    };
 
-        const fetchDataFrameInfo = async () => {
-            const res = await fetch('/get_data_info');
-            const data = await res.json();
-            if (res.ok) {
-                allColumns = data.data_info.columns;
-                timeColumns = allColumns.filter(col => ['date', 'heure', 'temps'].some(k => col.toLowerCase().includes(k)));
-                populateSelect(yColSelect, allColumns.filter(c => !timeColumns.includes(c)));
-                updateXColOptions();
-            }
-        };
-
-        const updateXColOptions = () => {
-            if (['line', 'bar'].includes(plotTypeSelect.value) && timeColumns.length > 0) {
-                populateSelect(xColSelect, [timeColumns[0]]);
-                xColSelect.disabled = true;
-            } else {
-                populateSelect(xColSelect, allColumns.filter(c => !timeColumns.includes(c)));
-                xColSelect.disabled = false;
-            }
-            populateSelect(colorColSelect, ["", ...allColumns.filter(c => !timeColumns.includes(c))], false, "Aucun");
-        };
-
-        plotForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const payload = {
-                plotType: plotTypeSelect.value,
-                xCol: xColSelect.value,
-                yCol: yColSelect.value,
-                colorCol: colorColSelect.value,
-                colorType: colorTypeSelect.value,
-                city: cityFilterSelect.value
-            };
-            document.getElementById('plot-card').classList.remove('hidden');
-            messageContainer.innerHTML = '<div class="loading-spinner mx-auto"></div>';
-
-            const res = await fetch('/generate_plot', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (res.ok) {
-                Plotly.newPlot('plot-container', JSON.parse(data.plot_json).data, JSON.parse(data.plot_json).layout, {responsive: true});
-                messageContainer.innerHTML = '';
-                redirectBtnContainer.classList.remove('hidden');
-                if (payload.yCol) { currentPollutant = payload.yCol; analysisBtnContainer.classList.remove('hidden'); }
-            }
-        });
-
-        const fetchUniqueCities = async () => {
-            const res = await fetch('/get_unique_cities');
-            const data = await res.json();
-            if (res.ok) populateSelect(cityFilterSelect, data.cities, true);
-        };
-
-        document.addEventListener('DOMContentLoaded', () => { fetchDataFrameInfo(); fetchUniqueCities(); });
-        plotTypeSelect.addEventListener('change', updateXColOptions);
-        downloadPlotBtn.addEventListener('click', () => Plotly.downloadImage('plot-container', {format: 'png', filename: 'polluguard_export'}));
-    </script>
+    // ==========================================
+    // 5. INITIALISATION ET EVENTS
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', () => { fetchInfo(); fetchCities(); });
+    plotTypeSelect.addEventListener('change', updateFormOptions);
+    analysisBtn.addEventListener('click', runAnalysis);
+    downloadPlotBtn.addEventListener('click', () => Plotly.downloadImage('plot-container', {format:'png', filename:'analytics_export'}));
+</script>
 </body>
 </html>
