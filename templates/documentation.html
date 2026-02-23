@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - Eurosmart Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="flex flex-col min-h-screen bg-gray-900 text-white antialiased">
+
+    <nav class="fixed top-0 left-0 w-full z-50 p-4 bg-gray-900/90 backdrop-blur-md shadow-md border-b border-gray-800">
+        <div class="container mx-auto flex justify-between items-center relative h-10">
+            
+            <div class="flex items-center gap-4 z-10">
+                <a href="/" class="text-gray-300 hover:text-blue-400 transition flex items-center gap-2 text-sm font-bold bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-xl shadow-sm border border-gray-700">
+                    <i class="fa-solid fa-arrow-left"></i> Accueil
+                </a>
+                <h1 class="text-xl md:text-2xl font-bold text-white flex items-center gap-3 hidden sm:flex">
+                    <i class="fa-solid fa-book text-blue-500"></i> Documentation
+                </h1>
+            </div>
+
+            <nav class="hidden lg:flex gap-6 text-sm font-bold text-gray-400 z-10">
+                <a href="/" class="hover:text-blue-400 transition">✨ Accueil</a>
+                <a href="/upload-data" class="hover:text-blue-400 transition">📁 Chargement</a>
+                <a href="/visualizations" class="hover:text-blue-400 transition">📈 Visualisation</a>
+                <a href="/prediction-modeling" class="hover:text-blue-400 transition">🔮 Prédiction</a>
+                <a href="/comparaison" class="hover:text-blue-400 transition">🌐 Comparaison</a>
+            </nav>
+        </div>
+    </nav>
+
+    <div class="pt-24"></div>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 mt-8 flex-grow mb-20">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-5xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                Comment fonctionne le logiciel ?
+            </h2>
+            <p class="text-lg text-gray-400 max-w-3xl mx-auto">
+                Ce guide vulgarisé explique étape par étape comment vos données brutes (fichiers ou capteurs) sont transformées en graphiques et en prédictions intelligentes.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+
+            <section id="upload" class="p-8 rounded-2xl bg-gray-800/50 border border-gray-700 border-t-4 border-t-blue-500 hover:-translate-y-1 transition-transform duration-300 shadow-lg">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-5 bg-blue-900/50 text-blue-400 text-2xl">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-white">1. L'Import des Données</h3>
+                <p class="text-gray-300 mb-5">L'application permet d'importer des données de deux manières :</p>
+                <ul class="space-y-4 text-sm text-gray-400">
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-file-csv text-blue-400 mt-1"></i> <span><strong class="text-white">Fichier Local :</strong> Vous donnez un fichier Excel ou CSV, le logiciel le lit automatiquement.</span></li>
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-wifi text-blue-400 mt-1"></i> <span><strong class="text-white">API Eurosmart :</strong> Vous entrez un code (ex: Paris_01). Le logiciel se connecte de manière sécurisée aux serveurs de PolluGuard et télécharge les données.</span></li>
+                </ul>
+                <div class="mt-6 bg-gray-900/80 p-4 rounded-lg text-sm text-gray-400 border border-gray-700">
+                    <strong class="text-blue-400">En coulisses :</strong> Le logiciel détecte automatiquement la ville grâce au GPS du capteur (via OpenStreetMap) et stocke les données dans une mémoire ultra-rapide appelée <em>Parquet</em>.
+                </div>
+            </section>
+
+            <section id="prep" class="p-8 rounded-2xl bg-gray-800/50 border border-gray-700 border-t-4 border-t-yellow-500 hover:-translate-y-1 transition-transform duration-300 shadow-lg">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-5 bg-yellow-900/50 text-yellow-400 text-2xl">
+                    <i class="fa-solid fa-broom"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-white">2. Le Nettoyage Magique</h3>
+                <p class="text-gray-300 mb-5">Les données des capteurs sont souvent imparfaites. Le logiciel fait le ménage sans que vous n'ayez rien à faire :</p>
+                <ul class="space-y-4 text-sm text-gray-400">
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-spell-check text-yellow-500 mt-1"></i> <span><strong class="text-white">Renommage :</strong> Les noms bizarres comme <code>_HR</code> deviennent "Humidité".</span></li>
+                    <li class="flex items-start gap-3"><i class="fa-regular fa-clock text-yellow-500 mt-1"></i> <span><strong class="text-white">Temps :</strong> Les dates sont converties dans un format standard lisible par l'ordinateur.</span></li>
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-plaster text-yellow-500 mt-1"></i> <span><strong class="text-white">Réparation :</strong> S'il manque une donnée (trou), le logiciel la remplace par la médiane (valeur moyenne) pour ne pas casser les graphiques.</span></li>
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-droplet text-yellow-500 mt-1"></i> <span><strong class="text-white">Calculs :</strong> Le logiciel peut calculer de nouvelles variables scientifiques, comme le <em>Point de Rosée</em>.</span></li>
+                </ul>
+            </section>
+
+            <section id="viz" class="p-8 rounded-2xl bg-gray-800/50 border border-gray-700 border-t-4 border-t-green-500 hover:-translate-y-1 transition-transform duration-300 shadow-lg">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-5 bg-green-900/50 text-green-400 text-2xl">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-white">3. La Visualisation Interactive</h3>
+                <p class="text-gray-300 mb-5">Vos données deviennent de véritables graphiques manipulables (zoom, survol) grâce à la technologie Plotly.</p>
+                <ul class="space-y-3 text-sm text-gray-400 mb-6">
+                    <li><strong class="text-white">Courbes :</strong> Pour voir l'évolution dans le temps.</li>
+                    <li><strong class="text-white">Secteurs & Histogrammes :</strong> Pour voir la répartition globale.</li>
+                    <li><strong class="text-white">Nuages de points :</strong> Pour voir si deux polluants sont liés.</li>
+                </ul>
+                <div class="bg-gray-900/80 p-4 rounded-lg text-sm text-gray-400 border border-gray-700">
+                    <strong class="text-green-400">Catégories intelligentes :</strong> Si vous analysez le CO2, l'application ne se contente pas d'afficher le chiffre. Elle colorie le graphique en "Vert" (Confort < 800ppm) ou "Rouge" (Non-Confort).
+                </div>
+            </section>
+
+            <section id="pred" class="p-8 rounded-2xl bg-gray-800/50 border border-gray-700 border-t-4 border-t-purple-500 hover:-translate-y-1 transition-transform duration-300 shadow-lg">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-5 bg-purple-900/50 text-purple-400 text-2xl">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-white">4. Intelligence Artificielle (Prédiction)</h3>
+                <p class="text-gray-300 mb-5">Le logiciel n'analyse pas seulement le passé, il tente de deviner le futur (sur les prochaines 24h).</p>
+                <ul class="space-y-4 text-sm text-gray-400">
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-microchip text-purple-500 mt-1"></i> <span><strong class="text-white">Machine Learning :</strong> Il utilise des modèles mathématiques avancés (Régression Linéaire, Forêts Aléatoires).</span></li>
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-magnifying-glass-chart text-purple-500 mt-1"></i> <span><strong class="text-white">Corrélations :</strong> L'IA regarde quelles variables évoluent ensemble pour mieux comprendre le phénomène.</span></li>
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-clock-rotate-left text-purple-500 mt-1"></i> <span><strong class="text-white">Lags (Mémoire) :</strong> L'IA apprend en regardant ce qu'il s'est passé à l'heure précédente pour prédire l'heure suivante.</span></li>
+                </ul>
+            </section>
+
+            <section id="meteo" class="p-8 rounded-2xl bg-gray-800/50 border border-gray-700 border-t-4 border-t-cyan-500 hover:-translate-y-1 transition-transform duration-300 shadow-lg">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-5 bg-cyan-900/50 text-cyan-400 text-2xl">
+                    <i class="fa-solid fa-cloud-sun"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-white">5. Comparaison Météo</h3>
+                <p class="text-gray-300 mb-5">Comment savoir si le capteur de l'école est fiable ?</p>
+                <div class="bg-gray-900/80 p-5 rounded-lg text-sm text-gray-400 border border-gray-700">
+                    <p>L'application interroge une base de données mondiale (<span class="font-bold text-white">Meteostat</span>) pour récupérer les relevés officiels de la station météorologique la plus proche de votre ville.</p>
+                    <p class="mt-3">Elle superpose ensuite la courbe de votre capteur avec la courbe de Météo France pour vérifier que les mesures (Température, Humidité) sont exactes.</p>
+                </div>
+            </section>
+
+            <section id="ia-analyse" class="p-8 rounded-2xl bg-gray-800/50 border border-gray-700 border-t-4 border-t-rose-500 hover:-translate-y-1 transition-transform duration-300 shadow-lg">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl mb-5 bg-rose-900/50 text-rose-400 text-2xl">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <h3 class="text-2xl font-bold mb-4 text-white">6. Interprétation Pédagogique</h3>
+                <p class="text-gray-300 mb-5">C'est la fonction la plus utile pour les élèves : un moteur d'explication automatique des graphiques.</p>
+                <ul class="space-y-4 text-sm text-gray-400">
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-arrow-trend-up text-rose-500 mt-1"></i> <span><strong class="text-white">Détection des Pics :</strong> Le logiciel trouve le point le plus haut et le plus bas.</span></li>
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-calendar-day text-rose-500 mt-1"></i> <span><strong class="text-white">Contexte temporel :</strong> Il regarde si ce pic s'est produit la nuit, le jour, le matin ou le week-end.</span></li>
+                    <li class="flex items-start gap-3"><i class="fa-solid fa-comment-dots text-rose-500 mt-1"></i> <span><strong class="text-white">Conclusion écrite :</strong> À partir d'une base de connaissances (ex: "Le CO2 augmente s'il y a des élèves dans la classe"), le logiciel rédige une phrase expliquant <em>pourquoi</em> la courbe a monté ou baissé.</span></li>
+                </ul>
+            </section>
+
+        </div>
+    </main>
+
+     <footer class="bg-gray-900/90 backdrop-blur-md border-t border-gray-800 p-4 text-center text-sm text-gray-400">
+        &copy; 2024 Eurosmart Analytics. Tous droits réservés. | <a href="/documentation" class="hover:text-blue-400 transition">Documentation</a>
+     </footer>
+
+</body>
+</html>

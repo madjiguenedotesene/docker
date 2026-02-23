@@ -1504,6 +1504,8 @@ def analyze_peaks():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
+@app.route('/documentation')
+def documentation():
+    return render_template('documentation.html')
 if __name__ == '__main__':
     app.run(debug=True)

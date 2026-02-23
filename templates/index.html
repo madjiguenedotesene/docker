@@ -6,10 +6,7 @@
     <title>Bienvenue - Eurosmart Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body class="flex flex-col min-h-screen">
-
-   <style>
+    <style>
         /* Animation pour le chargement */
         .loading-spinner {
             width: 40px; height: 40px;
@@ -19,11 +16,68 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Correction des Tooltips (Bulles flottantes) */
+        .tooltip-container {
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            background-color: rgba(31, 41, 55, 0.95); /* bg-gray-800 */
+            color: #fff;
+            text-align: left;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            position: absolute;
+            z-index: 50; /* S'assure que ça passe par-dessus tout le reste */
+            width: 300px; /* Largeur fixe pour éviter les textes interminables */
+            bottom: 110%; /* S'affiche au-dessus de la boîte par défaut */
+            left: 50%;
+            transform: translateX(-50%); /* Centre la bulle */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            transition: opacity 0.3s;
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1.4;
+        }
+
+        /* Flèche sous la bulle */
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -8px;
+            border-width: 8px;
+            border-style: solid;
+            border-color: rgba(31, 41, 55, 0.95) transparent transparent transparent;
+        }
+
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Si l'écran est petit, on affiche la bulle EN DESSOUS au lieu d'au-dessus pour éviter la coupure en haut */
+        @media (max-width: 768px) {
+            .tooltip-text {
+                bottom: auto;
+                top: 110%;
+                width: 250px;
+            }
+            .tooltip-text::after {
+                top: auto;
+                bottom: 100%;
+                border-color: transparent transparent rgba(31, 41, 55, 0.95) transparent;
+            }
+        }
     </style>
 </head>
-<body class="flex flex-col min-h-screen bg-gray-900">
+<body class="flex flex-col min-h-screen bg-gray-900 text-white">
 
-    <nav class="fixed top-0 left-0 w-full z-10 p-4 bg-gray-900/90 backdrop-blur-md shadow-md">
+    <nav class="fixed top-0 left-0 w-full z-10 p-4 bg-gray-900/90 backdrop-blur-md shadow-md border-b border-gray-800">
         <div class="container mx-auto flex justify-between items-center relative h-10">
             <a href="/" class="h-10 flex items-center z-10">
                  <img src="static/images/logo.png" alt="Logo Eurosmart Analytics" class="h-12">
@@ -34,82 +88,72 @@
         </div>
     </nav>
 
+    <div class="pt-24"></div>
+
     <main class="container mx-auto p-8 flex-grow">
         <div id="main-content">
             
-            <h1 id="welcome-message" class="text-4xl md:text-5xl font-extrabold text-center mb-6">Bienvenue dans votre outil d'analyse de données</h1>
+            <h1 id="welcome-message" class="text-4xl md:text-5xl font-extrabold text-center mb-10">
+                Bienvenue dans votre outil d'analyse de données
+            </h1>
             
-            <div class="text-center">
-                <a href="/upload-data" class="btn-gradient inline-block px-8 py-3 rounded-full text-lg shadow-xl hover:scale-105 transition-transform duration-300">
+            <div class="text-center flex justify-center gap-4 flex-wrap">
+                <a href="/upload-data" class="btn-gradient inline-flex items-center px-8 py-3 rounded-full text-lg shadow-xl hover:scale-105 transition-transform duration-300">
                     Commencer l'analyse 
+                </a>
+                <a href="/documentation" target="_blank" rel="noopener noreferrer" class="btn-gradient inline-flex items-center px-8 py-3 rounded-full text-lg shadow-xl hover:scale-105 transition-transform duration-300">
+                    Voir la Documentation
                 </a>
             </div>
 
-            <div class="text-center mt-12">
-                <h2 class="text-3xl font-bold mb-4">Comment utiliser l'outil ?</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div class="mt-16">
+                <h2 class="text-3xl font-bold mb-8 text-center">Comment utiliser l'outil ?</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
                     
-                    <!-- ÉTAPE 1: CHARGER -->
-                    <div class="p-6 main-card help-item text-center tooltip-container">
-                        <span class="text-5xl">📁</span>
+                    <div class="p-6 main-card help-item text-center tooltip-container rounded-2xl bg-gray-800/50 border border-gray-700">
+                        <span class="text-5xl mb-4 block">📁</span>
                         <h3 class="text-xl font-semibold mb-2">Charger</h3>
                         
-                        <span class="tooltip-text">
+                        <div class="tooltip-text">
                             <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
                             <p>Cliquez sur "Commencer l'analyse" puis sur l'icône de téléchargement. Sélectionnez vos fichiers (CSV, XLSX) à importer.</p>
                             <hr class="border-gray-600 my-2">
                             <p class="font-bold mb-1 text-yellow-300">Pourquoi cette étape ?</p>
-                            <p>C'est le point de départ. Une fois chargés, l'outil analyse automatiquement la structure des données et leur type, vous préparant pour le nettoyage.</p>
-                        </span>
-                    </div>
-                    
-                    <!-- ÉTAPE 2: NETTOYER -->
-                    <div class="p-6 main-card help-item text-center tooltip-container">
-                        <span class="text-5xl">🧼</span>
-                        <h3 class="text-xl font-semibold mb-2">Nettoyer</h3>
-                
-                        <span class="tooltip-text">
-                            <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
-                            <p>Après le chargement, allez à la page "Nettoyage". Utilisez les boutons pour visualiser la moyenne, les villes et les statistiques descriptives.</p>
-                            <hr class="border-gray-600 my-2">
-                            <p class="font-bold mb-1 text-yellow-300">Concepts Clés</p>
-                            <p>Le Point de Rosée est crucial pour l'humidité. La différence T-PR (Température moins Point de Rosée) est un indicateur de la saturation de l'air. Une petite différence signifie beaucoup d'humidité.</p>
-                        </span>
+                            <p>C'est le point de départ. Une fois chargés, l'outil analyse automatiquement la structure des données et leur type.</p>
+                        </div>
                     </div>
 
-                    <!-- ÉTAPE 3: PRÉVISUALISER (VISUALISATION, COULEURS) -->
-                    <div class="p-6 main-card help-item text-center tooltip-container">
-                        <span class="text-5xl">📈</span>
+                    <div class="p-6 main-card help-item text-center tooltip-container rounded-2xl bg-gray-800/50 border border-gray-700">
+                        <span class="text-5xl mb-4 block">📈</span>
                         <h3 class="text-xl font-semibold mb-2">Prévisualiser</h3>
                         
-                        <span class="tooltip-text">
+                        <div class="tooltip-text">
                             <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
                             <p>Allez à la page Visualisation. Choisissez les colonnes que vous voulez comparer (ex: Température vs Humidité) pour générer des graphiques.</p>
                             <hr class="border-gray-600 my-2">
                             <p class="font-bold mb-1 text-yellow-300">Concepts Clés</p>
-                            <p>Les Couleurs et Catégories sont utilisées pour segmenter vos données, par exemple, afficher les points de données par ville ou par type d'événement pour identifier des tendances spécifiques.</p>
-                        </span>
+                            <p>Les Couleurs et Catégories sont utilisées pour segmenter vos données, par exemple, afficher les points de données par ville ou par type d'événement.</p>
+                        </div>
                     </div>
 
-                    <!-- ÉTAPE 4: PRÉDIRE (RÉGRESSION, R² & CORRÉLATION) -->
-                    <div class="p-6 main-card help-item text-center tooltip-container">
-                        <span class="text-5xl">🔮</span>
+                    <div class="p-6 main-card help-item text-center tooltip-container rounded-2xl bg-gray-800/50 border border-gray-700">
+                        <span class="text-5xl mb-4 block">🔮</span>
                         <h3 class="text-xl font-semibold mb-2">Prédire</h3>
                        
-                        <span class="tooltip-text">
-                            <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
-                            <p>Allez à la page Modélisation. Sélectionnez une colonne cible (la variable que vous voulez prédire, ex: "Température") et lancez le modèle pour obtenir une prédiction.</p>
+                        <div class="tooltip-text" style="width: 350px;"> <p class="font-bold mb-1 text-yellow-300">Comment Procéder ?</p>
+                            <p>Allez à la page Modélisation. Sélectionnez une variable cible (ex: "Température") et lancez le modèle pour obtenir une prédiction.</p>
                             <hr class="border-gray-600 my-2">
                             <p class="font-bold mb-1 text-yellow-300">Concepts Clés</p>
-                            <p>Le Coefficient R² (ou Coefficient de Détermination) est le score que vous devez surveiller. Un R² de 1 (ou 100%) signifie que votre modèle prédit parfaitement les résultats. Plus il est proche de 1, meilleur est votre modèle.</p>
-                            <p>La Corrélation mesure la relation entre deux variables : proche de +1 signifie qu'elles augmentent ensemble ; proche de -1 signifie que l'une augmente pendant que l'autre diminue.</p>
-                        </span>
+                            <p class="mb-2">Le <strong>Coefficient R²</strong> est le score à surveiller. Un R² de 1 (100%) signifie une prédiction parfaite.</p>
+                            <p>La <strong>Corrélation</strong> mesure la relation entre deux variables (+1 = augmentent ensemble, -1 = inverse).</p>
+                        </div>
                     </div>
+
                 </div>
             </div>
         </div>
-
-        </main>
+    </main>
     
     <footer class="footer-transparent text-gray-400 p-6 mt-8 text-center">
         <div class="container mx-auto flex flex-wrap justify-center gap-6">
@@ -123,4 +167,3 @@
 
 </body>
 </html>
-
