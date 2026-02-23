@@ -1160,7 +1160,7 @@ def train_predict():
     for name in results.keys():
         if 'error' not in results[name]:
             predictions_data[name] = predict_future_24h(name)
-
+    
     return jsonify({
         'message': 'Analyse 24H terminée.',
         'features_used': features_final,
@@ -1303,9 +1303,133 @@ def compare_with_meteo():
         'plots': plots
     })
 
-# ==============================================================================
-# 🧠 MOTEUR D'ANALYSE INTELLIGENT (CORRIGÉ)
-# ==============================================================================
+import requests
+import pandas as pd
+
+def fetch_openaq_data(lat, lon, start_date, end_date, parameter='pm10'):
+    """Récupère les données de pollution via coordonnées GPS (rayon 50km)."""
+    url = "https://api.openaq.org/v2/measurements"
+
+    # On cherche dans un rayon de 100km autour du capteur
+    params = {
+        "coordinates": f"{lat},{lon}",
+        "radius": 100000, # Rayon de 100km pour être sûr
+        "parameter": parameter,
+        "date_from": start_date.strftime('%Y-%m-%d'), # Format simplifié
+        "date_to": end_date.strftime('%Y-%m-%d'),     # Format simplifié
+        "limit": 10000,
+        "sort": "desc"
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code != 200: return pd.DataFrame()
+        print(f"--- DEBUG OPENAQ ---")
+        print(f"URL: {response.url}")
+        print(f"Status: {response.status_code}")
+        print(f"Nb resultats: {len(response.json().get('results', []))}")    
+        results = response.json().get('results', [])
+        if not results: return pd.DataFrame()
+        
+            
+        data = [{'time': r['date']['local'], f'official_{parameter}': r['value']} for r in results]
+        official_df = pd.DataFrame(data)
+        official_df['time'] = pd.to_datetime(official_df['time']).dt.tz_localize(None)
+        
+        return official_df.groupby(pd.Grouper(key='time', freq='h')).mean()
+    except Exception as e:
+        print(f"Erreur OpenAQ Coords: {e}")
+        return pd.DataFrame()
+@app.route('/compare_with_pollution', methods=['POST'])
+def compare_with_pollution():
+    df = get_df_from_session()
+    time_col = session.get('time_col')
+
+    if df is None or not time_col:
+        return jsonify({'error': 'Données non trouvées en session.'}), 400
+
+    req_data = request.get_json()
+    pm10_col = req_data.get('temp_col') 
+    pm25_col = req_data.get('humidity_col') 
+    city_name = req_data.get('city_name')
+
+    try:
+        # 1. PRÉPARATION DES DONNÉES DU CAPTEUR (On définit df_indexed ici !)
+        df_prepared = df.copy()
+        df_prepared[time_col] = pd.to_datetime(df_prepared[time_col], dayfirst=True).dt.tz_localize(None)
+        
+        start_date = df_prepared[time_col].min()
+        end_date = df_prepared[time_col].max()
+        
+        # On définit df_indexed AVANT toute tentative de récupération API
+        df_indexed = df_prepared.set_index(time_col).resample('h').mean(numeric_only=True)
+
+        # 2. GÉOLOCALISATION POUR OPENAQ
+        geolocator = Nominatim(user_agent="pollugard_expert")
+        location = geolocator.geocode(city_name)
+        
+        official_pm10 = pd.DataFrame()
+        official_pm25 = pd.DataFrame()
+
+        if location:
+            lat, lon = location.latitude, location.longitude
+            # APPEL API AVEC COORDONNÉES
+            official_pm10 = fetch_openaq_data(lat, lon, start_date, end_date, 'pm10')
+            official_pm25 = fetch_openaq_data(lat, lon, start_date, end_date, 'pm25')
+
+        # 3. FUSION DES DONNÉES
+        comparison_df = df_indexed.copy()
+        
+        has_official_pm10 = not official_pm10.empty
+        has_official_pm25 = not official_pm25.empty
+
+        if has_official_pm10:
+            comparison_df = comparison_df.merge(official_pm10, left_index=True, right_index=True, how='left')
+        if has_official_pm25:
+            comparison_df = comparison_df.merge(official_pm25, left_index=True, right_index=True, how='left')
+
+        # 4. GÉNÉRATION DES GRAPHIQUES
+        plots = {}
+        
+        # --- Graphe PM10 ---
+        fig1 = go.Figure()
+        fig1.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df[pm10_col], 
+                                 name='Mon Capteur (PM10)', line=dict(color='purple', width=2)))
+        
+        if has_official_pm10:
+            fig1.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df['official_pm10'], 
+                                     name='Station Officielle (PM10)', line=dict(color='black', dash='dash')))
+            title_pm10 = f'Comparaison PM10 - {city_name}'
+        else:
+            title_pm10 = f'PM10 - {city_name} (Station officielle introuvable)'
+
+        fig1.update_layout(title=title_pm10, xaxis_title='Temps', yaxis_title='µg/m³', template="plotly_white")
+        plots['temperature'] = fig1.to_json()
+
+        # --- Graphe PM2.5 ---
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df[pm25_col], 
+                                 name='Mon Capteur (PM2.5)', line=dict(color='red', width=2)))
+        
+        if has_official_pm25:
+            fig2.add_trace(go.Scatter(x=comparison_df.index, y=comparison_df['official_pm25'], 
+                                     name='Station Officielle (PM2.5)', line=dict(color='black', dash='dash')))
+            title_pm25 = f'Comparaison PM2.5 - {city_name}'
+        else:
+            title_pm25 = f'PM2.5 - {city_name} (Station officielle introuvable)'
+
+        fig2.update_layout(title=title_pm25, xaxis_title='Temps', yaxis_title='µg/m³', template="plotly_white")
+        plots['humidity'] = fig2.to_json()
+
+        return jsonify({
+            'status': 'success',
+            'city': city_name,
+            'plots': plots
+        })
+
+    except Exception as e:
+        print(f"Erreur Route Pollution: {e}")
+        return jsonify({'error': f"Erreur de traitement: {str(e)}"}), 500
 # ==============================================================================
 # 1. BASE DE CONNAISSANCE ENRICHIE (Agriculture, Industrie, BTP...)
 # ==============================================================================
@@ -1371,141 +1495,241 @@ def get_time_context(date):
     elif m in [3, 4, 5]: season = "Printemps"
     elif m in [6, 7, 8]: season = "Été"
     return period, season, is_weekend
-# ==============================================================================
-# 🧠 MOTEUR D'ANALYSE INTELLIGENT (VERSION FINALE SANS UNDEFINED)
-# ==============================================================================
-
-def generate_explanation(knowledge_key, value, context, is_peak=True):
-    """
-    Génère une analyse pour l'extérieur.
-    is_peak=True  -> Analyse du Maximum
-    is_peak=False -> Analyse du Minimum (Creux)
-    """
-    if not knowledge_key: return "Analyse des conditions ambiantes."
-    
-    period, season, is_weekend = context
-    causes = []
-    key = knowledge_key.upper()
-
-    # --- LOGIQUE POUR LES CREUX (MINIMA) ---
-    if not is_peak:
-        if 'PM' in key or 'NOX' in key or 'CO2' in key:
-            causes.append("En tenant compte de la faible concentration, les causes sont probablement liées à un lessivage de l'air par la pluie ou à une dispersion efficace des polluants par des vents soutenus.")
-        elif 'TEMPERATURE' in key:
-            causes.append("En tenant compte du refroidissement, les causes sont probablement liées à l'absence d'ensoleillement et à la déperdition thermique du sol vers l'atmosphère (nuit claire).")
-        elif 'HUMIDITE' in key:
-            causes.append("En tenant compte de l'air sec, les causes sont probablement liées à l'arrivée d'une masse d'air continentale ou à un réchauffement rapide du sol qui dissipe l'humidité de surface.")
-        else:
-            causes.append("Les conditions météorologiques actuelles favorisent une stabilisation des niveaux aux valeurs les plus basses enregistrées.")
-        return f"Analyse : {', '.join(causes)}"
-
-    # --- LOGIQUE POUR LES PICS (MAXIMA) ---
-    if 'PM' in key:
-        if period == "Pointe Matin":
-            if season == "Hiver":
-                causes.append("En tenant compte de l'inversion thermique, les causes sont probablement liées au piégeage des particules de combustion au sol par une couche d'air froid.")
-            else:
-                causes.append("En tenant compte de la reprise des flux, les causes sont probablement liées aux émissions de freinage et d'échappement du trafic routier.")
-        elif period in ["Pointe Soir", "Nuit"] and season in ["Hiver", "Automne"]:
-            causes.append("En tenant compte du froid nocturne, les causes sont probablement liées à l'intensification du chauffage résidentiel local.")
-
-    elif 'CO2' in key:
-        if period in ["Pointe Matin", "Pointe Soir"]:
-            causes.append("En tenant compte du trafic, les causes sont probablement liées à la concentration des rejets de combustion des moteurs thermiques en zone urbaine.")
-        elif period == "Nuit":
-            causes.append("En tenant compte du cycle végétal, les causes sont probablement liées à la respiration nocturne des plantes rejetant du CO2 en l'absence de photosynthèse.")
-
-    elif 'TEMPERATURE' in key:
-        if period == "Journée":
-            causes.append("En tenant compte de l'albédo, les causes sont probablement liées au rayonnement solaire direct et à l'accumulation de chaleur sur les surfaces minérales.")
-        else:
-            causes.append("En tenant compte du contexte temporel, les causes sont probablement liées à une stagnation d'une masse d'air chaud ou à une inertie thermique locale.")
-
-    elif 'HUMIDITE' in key:
-        if season == "Hiver" and period == "Pointe Matin" and value > 85:
-            causes.append("En tenant compte du froid matinal, les causes sont probablement liées à la saturation de l'air atteignant son point de rosée (formation de brouillard ou givre).")
-        elif season == "Été" and value > 70:
-            causes.append("En tenant compte de la chaleur, les causes sont probablement liées à une forte évapotranspiration ou à une instabilité pré-orageuse.")
-        elif value > 85:
-            causes.append("En tenant compte du taux élevé, les causes sont probablement liées à des précipitations récentes ou à un refroidissement rapide de l'air ambiant.")
-
-    if not causes:
-        return "Analyse : Fluctuations normales liées aux cycles météorologiques extérieurs."
-    
-    return f"Analyse : {', '.join(causes)}"
-
-@app.route('/analyze_peaks', methods=['POST'])
-def analyze_peaks():
-    try:
-        df = get_df_from_session()
-        if df is None: return jsonify({'error': 'Données non trouvées'}), 400
-        
-        req = request.json
-        raw_pollutant = req.get('pollutant', '')
-        
-        data_col = next((c for c in df.columns if raw_pollutant.lower() in c.lower()), None)
-        if not data_col: return jsonify({'error': 'Polluant introuvable'}), 400
-
-        # Identification de la clé pour éviter le "UNDEFINED"
-        knowledge_key = None
-        for snippet, key in VAR_MAPPING.items():
-            if snippet in raw_pollutant.lower() or snippet in data_col.lower():
-                knowledge_key = key
-                break
-        
-        # Le nom affiché sera le knowledge_key (ex: PM10) au lieu de rien
-        display_name = knowledge_key if knowledge_key else raw_pollutant
-
-        group_col = next((c for c in df.columns if c.lower() in ['city', 'ville', 'nom']), None)
-        analysis_results = {}
-
-        def analyze_subset(sub_df):
-            valid_df = sub_df.dropna(subset=[data_col])
-            if valid_df.empty: return None
-            
-            # --- PIC (MAX) ---
-            peak_row = valid_df.loc[valid_df[data_col].idxmax()]
-            ctx_peak = get_time_context(peak_row['temps'])
-            peak_data = {
-    'time': peak_row['temps'].strftime('%d/%m %H:%M'),
-    'value': round(peak_row[data_col], 2),
-    'explanation': generate_explanation(knowledge_key, peak_row[data_col], ctx_peak, is_peak=True)
-}
-
-            # --- CREUX (MIN) ---
-            trough_row = valid_df.loc[valid_df[data_col].idxmin()]
-            ctx_trough = get_time_context(trough_row['temps'])
-            trough_data = {
-    'time': trough_row['temps'].strftime('%d/%m %H:%M'),
-    'value': round(trough_row[data_col], 2),
-    # IMPORTANT : bien mettre is_peak=False ici !
-    'explanation': generate_explanation(knowledge_key, trough_row[data_col], ctx_trough, is_peak=False)
-}
-            
-            return {
-                'stats': {'avg': round(valid_df[data_col].mean(), 2), 'max': round(peak_row[data_col], 2), 'min': round(trough_row[data_col], 2)},
-                'peaks': [peak_data],
-                'troughs': [trough_data]
-            }
-
-        if group_col:
-            for g in df[group_col].dropna().unique():
-                res = analyze_subset(df[df[group_col] == g])
-                if res: analysis_results[str(g)] = res
-        else:
-            res = analyze_subset(df)
-            if res: analysis_results["Global"] = res
-
-        return jsonify({
-            'pollutant': display_name,  # On envoie un nom valide ici pour le badge
-            'knowledge': POLLUTANT_KNOWLEDGE.get(knowledge_key, {}),
-            'analysis': analysis_results
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 @app.route('/documentation')
 def documentation():
     return render_template('documentation.html')
+
+
+# ==============================================================================
+# 🤖 ASSISTANT IA LOCAL : CHAT AVEC LES DONNÉES (NLP MAPPING AVANCÉ)
+# ==============================================================================
+import re
+import time
+import pandas as pd
+
+def parse_and_answer_question(df, question):
+    q_lower = question.lower()
+    numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+    
+    # =========================================================
+    # 🧠 1. QUESTIONS SUR LE MACHINE LEARNING & METEO (PRIORITÉ ABSOLUE)
+    # =========================================================
+    
+    # --- NOUVEAU BLOC : Fiabilité et Réalité (Page Comparaison) ---
+    if any(w in q_lower for w in ['réalité', 'realite', 'vrai', 'météo', 'meteo', 'précis', 'fiable', 'exact']):
+        return ("☁️ **Analyse de la fiabilité (Capteur vs Réalité)** :\n"
+                "Pour savoir si les mesures sont proches de la réalité, observez les graphiques sur cette page :\n"
+                "- **Courbe bleue** : Ce que votre capteur a mesuré.\n"
+                "- **Courbe orange** : Ce que la station Météo France officielle a mesuré.\n\n"
+                "👉 **Si les courbes se superposent** : Votre capteur est parfaitement étalonné.\n"
+                "👉 **S'il y a un grand écart** : Le capteur est peut-être en plein soleil (surchauffe) ou dans un endroit trop confiné.")
+
+
+    
+    # R²
+    if any(w in q_lower for w in ['r2', 'r²', 'r carré', 'score', 'fiable', 'fiabilité', 'le r ', 'le r?']):
+        return ("🧠 **Le score R² (Coefficient de Détermination)** :\n"
+                "Il mesure la fiabilité de la prédiction de l'IA.\n"
+                "- **Proche de 100%** : L'IA a parfaitement compris vos données et la prédiction est très fiable.\n"
+                "- **En dessous de 50%** : La prédiction est incertaine, l'IA manque de données ou les facteurs choisis ne sont pas les bons.")
+
+    # MSE
+    if any(w in q_lower for w in ['mse', 'erreur', 'moyenne quadratique', 'marge']):
+        return ("🧠 **L'Erreur Quadratique Moyenne (MSE)** :\n"
+                "C'est la marge d'erreur de l'IA. Plus ce chiffre est proche de 0, plus la courbe prédite collera à la réalité.")
+        
+    # Comment fonctionne la prédiction (Gestion des accents)
+    if any(w in q_lower for w in ['comment', 'marche', 'fonctionne', 'principe', 'expliqu']) and any(w in q_lower for w in ['prediction', 'prédiction', 'ia', 'algorithme']):
+        return ("🧠 **Comment fonctionne la prédiction ?**\n"
+                "J'utilise des algorithmes (comme la Forêt Aléatoire) qui étudient le passé (vos données) pour trouver des schémas répétitifs.\n"
+                "Ensuite, j'utilise ces schémas pour deviner ce qu'il va se passer dans les prochaines 24h, heure par heure.")
+
+    # Quel est le meilleur modèle
+    if any(w in q_lower for w in ['meilleur', 'quel', 'choisir']) and any(w in q_lower for w in ['modele', 'modèle', 'algorithme', 'ia']):
+        return ("🧠 **Comment choisir le meilleur modèle ?**\n"
+                "Regardez les cartes de résultats : le meilleur modèle est celui qui a le **R² le plus élevé** (le plus proche de 100%) et le **MSE le plus bas**.\n"
+                "💡 *Astuce : L'application l'encadre automatiquement en vert avec le badge 'Top' !*")
+    # 1. Identifier TOUTES les variables (colonnes) mentionnées dans la question
+    found_cols = []
+    for key, concept in VAR_MAPPING.items():
+        if key.lower() in q_lower or concept.lower() in q_lower:
+            for col in numeric_cols:
+                if concept.lower() in col.lower() or key.lower() in col.lower():
+                    if col not in found_cols:
+                        found_cols.append(col)
+
+    if not found_cols:
+        for col in numeric_cols:
+            if col.lower() in q_lower:
+                found_cols.append(col)
+
+    # 2. Identifier TOUTES les villes mentionnées
+    cities_in_db = df['city'].dropna().unique().tolist() if 'city' in df.columns else []
+    found_cities = [c for c in cities_in_db if c.lower() in q_lower]
+
+    target_col = found_cols[0] if found_cols else None
+
+    # =========================================================
+    # 🧠 EXPLICATION / CAUSES (LE "POURQUOI")
+    # =========================================================
+    if any(w in q_lower for w in ['cause', 'pourquoi', 'raison', 'expliqu', 'origine', 'provoque']):
+        if not target_col:
+            return "De quelle donnée voulez-vous connaître la cause ? (ex: 'pourquoi le CO2 augmente ?')"
+
+        # Retrouver la clé de connaissance exacte (ex: 'CO2', 'PM10')
+        knowledge_key = None
+        for snippet, key in VAR_MAPPING.items():
+            if snippet in target_col.lower() or key.lower() in target_col.lower():
+                knowledge_key = key
+                break
+        
+        # Si on a la réponse dans notre dictionnaire d'expert
+        if knowledge_key and knowledge_key in POLLUTANT_KNOWLEDGE:
+            know = POLLUTANT_KNOWLEDGE[knowledge_key]
+            
+            # Est-ce qu'on demande la cause d'une hausse ou d'une baisse ?
+            is_baisse = any(w in q_lower for w in ['baisse', 'diminu', 'chute', 'descend'])
+            is_hausse = any(w in q_lower for w in ['hausse', 'augment', 'monte', 'pic', 'élevé', 'maximum'])
+            
+            reponse = f"💡 **Explication pour {target_col}** :\n_{know['desc']}_\n\n"
+            
+            if is_hausse:
+                return reponse + f"🔴 **Causes probables de la hausse** : {know['hausse']}"
+            elif is_baisse:
+                return reponse + f"🟢 **Causes probables de la baisse** : {know['baisse']}"
+            else:
+                return reponse + f"🔴 **En cas de hausse** : {know['hausse']}\n🟢 **En cas de baisse** : {know['baisse']}"
+        else:
+            return f"Désolé, je n'ai pas d'explication scientifique pré-enregistrée pour {target_col}."
+
+    # =========================================================
+    # 🚀 MOTEUR DE COMPARAISON PROACTIF
+    # =========================================================
+    is_comparison = any(word in q_lower for word in ['compar', 'différence', 'vs', 'entre', 'plus que', 'moins que', 'lequel'])
+
+    if is_comparison:
+        # ASTUCE : Si l'utilisateur dit "compare les villes" sans les nommer, 
+        # et qu'il y a exactement 2 villes en mémoire, l'IA les sélectionne automatiquement !
+        if len(found_cities) < 2 and len(cities_in_db) == 2:
+            found_cities = cities_in_db
+
+        # Cas A : Comparaison de 2 villes
+        if len(found_cities) >= 2:
+            if not target_col:
+                return f"Je peux comparer {found_cities[0]} et {found_cities[1]}. Sur quelle donnée ? (Tape par exemple : 'compare le CO2')"
+            
+            col = target_col
+            city1, city2 = found_cities[0], found_cities[1]
+            
+            mean1 = df[df['city'] == city1][col].mean()
+            mean2 = df[df['city'] == city2][col].mean()
+            
+            if pd.isna(mean1) or pd.isna(mean2):
+                return "Désolé, il manque des données pour faire cette comparaison."
+                
+            diff = abs(mean1 - mean2)
+            higher = city1 if mean1 > mean2 else city2
+            
+            return (f"⚖️ **Comparaison de {col} : {city1} vs {city2}**\n\n"
+                    f"- {city1} : moyenne de {mean1:.2f}\n"
+                    f"- {city2} : moyenne de {mean2:.2f}\n\n"
+                    f"👉 **{higher}** a un niveau plus élevé (différence de {diff:.2f}).")
+
+        # Cas B : Comparaison de 2 variables (Corrélation)
+        elif len(found_cols) >= 2:
+            col1, col2 = found_cols[0], found_cols[1]
+            target_df = df[df['city'] == found_cities[0]] if len(found_cities) == 1 else df
+            city_context = f" à {found_cities[0]}" if len(found_cities) == 1 else " au global"
+            
+            corr = target_df[col1].corr(target_df[col2])
+            
+            if pd.isna(corr):
+                return "Impossible de calculer le lien entre ces variables avec les données actuelles."
+                
+            relation = "fortement" if abs(corr) > 0.5 else "faiblement"
+            sens = "dans le même sens ↗️↗️" if corr > 0 else "en sens inverse ↗️↘️"
+            
+            return (f"⚖️ **Analyse croisée : {col1} et {col2}{city_context}**\n\n"
+                    f"Le score de corrélation est de **{corr:.2f}**.\n"
+                    f"👉 Cela signifie que ces deux paramètres sont **{relation} liés** et évoluent généralement **{sens}**.")
+        else:
+            return "Pour comparer, précisez ce que vous voulez analyser (ex: 'compare le CO2 entre Évry et Noisy')."
+    
+    # =========================================================
+    # RESTE DU MOTEUR (Intentions classiques : Max, Min, Tendance)
+    # =========================================================
+    target_city = found_cities[0] if found_cities else None
+    working_df = df[df['city'] == target_city] if target_city else df
+    city_str = f" à {target_city}" if target_city else " au global"
+    
+    if working_df.empty:
+        return f"Aucune donnée trouvée pour {target_city}."
+
+    if not target_col:
+        if 'combien' in q_lower and ('ligne' in q_lower or 'donnée' in q_lower):
+            return f"Il y a actuellement {len(working_df)} relevés{city_str}."
+        if 'ville' in q_lower:
+            return f"Villes analysées : {', '.join(cities_in_db)}."
+        return "Précisez la variable à analyser (ex: 'Quel est le max de CO2 ?')."
+
+    # MAX / PIC
+    if any(w in q_lower for w in ['max', 'maximum', 'pire', 'pic', 'plus haut']):
+        idx = working_df[target_col].idxmax()
+        val = working_df.loc[idx, target_col]
+        
+        pic_city = working_df.loc[idx, 'city'] if 'city' in working_df.columns else "inconnue"
+        pic_time = working_df.loc[idx, 'temps'].strftime('%d/%m/%Y à %H:%M') if 'temps' in working_df.columns else "date inconnue"
+        
+        context = f" à **{target_city}**" if target_city else f" (enregistré à **{pic_city}**)"
+        return f"📈 Le pic de **{target_col}**{context} est de **{val:.2f}**, le {pic_time}."
+
+    # MIN / CREUX
+    if any(w in q_lower for w in ['min', 'minimum', 'meilleur', 'creux', 'plus bas']):
+        idx = working_df[target_col].idxmin()
+        val = working_df.loc[idx, target_col]
+        
+        pic_city = working_df.loc[idx, 'city'] if 'city' in working_df.columns else "inconnue"
+        pic_time = working_df.loc[idx, 'temps'].strftime('%d/%m/%Y à %H:%M') if 'temps' in working_df.columns else "date inconnue"
+        
+        context = f" à **{target_city}**" if target_city else f" (enregistré à **{pic_city}**)"
+        return f"📉 Le minimum de **{target_col}**{context} est de **{val:.2f}**, le {pic_time}."
+
+    # TENDANCE
+    if any(w in q_lower for w in ['tendance', 'évolution', 'hausse', 'baisse']):
+        if 'temps' in working_df.columns:
+            sorted_df = working_df.sort_values('temps')
+            first_val = sorted_df[target_col].iloc[:10].mean()
+            last_val = sorted_df[target_col].iloc[-10:].mean()
+            trend = "en hausse ↗️" if last_val > first_val else "en baisse ↘️"
+            return f"La tendance de **{target_col}**{city_str} est **{trend}**."
+
+    # MOYENNE (Par défaut)
+    val = working_df[target_col].mean()
+    return f"📊 La moyenne de **{target_col}**{city_str} est de **{val:.2f}**."
+
+# ==============================================================================
+# 🛜 ROUTE API DU CHATBOT
+# ==============================================================================
+
+@app.route('/ask_ai', methods=['POST'])
+def ask_ai():
+    """Route API pour le widget de chat"""
+    df = get_df_from_session()
+    if df is None:
+        return jsonify({'response': "Veuillez charger des données avant de me poser des questions."})
+    
+    question = request.json.get('question', '')
+    if not question:
+        return jsonify({'response': "Vous n'avez rien écrit !"})
+        
+    try:
+        time.sleep(0.5) # Petit délai pour faire plus naturel
+        answer = parse_and_answer_question(df, question)
+        return jsonify({'response': answer})
+    except Exception as e:
+        app.logger.error(f"Erreur IA Chat: {e}")
+        return jsonify({'response': "Désolé, une erreur technique m'empêche d'analyser les données pour le moment."}), 500
+    
+
 if __name__ == '__main__':
     app.run(debug=True)
